@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASTRA GAMING - DRAFT</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter e Orbitron para estilo Gamer -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Bebas Neue:wght@600;800;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            darkBg: 'rgb(var(--color-dark-bg-rgb) / <alpha-value>)',
+                            cardBg: 'rgb(var(--color-card-bg-rgb) / <alpha-value>)',
+                            panelBg: 'rgb(var(--color-panel-bg-rgb) / <alpha-value>)',
+                            pink: 'rgb(var(--color-pink-rgb) / <alpha-value>)',
+                            pinkDark: '#551A8B',
+                            pinkGlow: 'rgba(39, 64, 139)',
+                            capGold: '#fbbf24',
+                        }
+                    },
+                    fontFamily: {
+                        gamer: ['Sansation', 'sans-serif'],
+                        body: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --color-dark-bg-rgb: 9 8 14;
+            --color-card-bg-rgb: 18 17 26;
+            --color-panel-bg-rgb: 85 26 139;
+            --color-pink-rgb: 147 112 219;
+        }
+
+        /* Custom scrollbar para estilo cyberpunk/gamer */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09080e;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00a77d;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00a77d;
+        }
+
+        /* Efeitos Neon */
+        .neon-border {
+            box-shadow: 0 0 10px rgba(53, 0, 78, 0.3), inset 0 0 5px rgba(53, 0, 78, 0.3);
+        }
+        .neon-border-active {
+            box-shadow: 0 0 20px rgba(98, 0, 255, 0.8), inset 0 0 10px rgba(53, 0, 78, 0.3);
+        }
+        .neon-text {
+            text-shadow: 0 0 8px rgba(96, 0, 255, 0.8);
+        }
+
+        /* Animações de Drag and Drop */
+        .dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+        .drag-over {
+            border-color: #a200ff !important;
+            background-color: rgba(53, 0, 78, 0.03) !important;
+        }
+
+        /* Animação do Pick Ativo */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(98, 0, 255, 0.8); }
+            50% { box-shadow: 0 0 25px rgb(132, 0, 255); }
+        }
+        .active-turn {
+            animation: pulseGlow 1.8s infinite ease-in-out;
+            border-color: #a200ff !important;
+        }
+    </style>
+</head>
+<body class="bg-brand-darkBg text-gray-100 font-body min-h-screen flex flex-col antialiased selection:bg-brand-pink selection:text-white">
+
+    <!-- BARRA SUPERIOR (HEADER) -->
+    <header class="bg-brand-cardBg border-b-2 border-brand-pink px-4 lg:px-8 py-4 flex flex-wrap justify-between items-center shadow-lg gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-brand-pink flex items-center justify-center text-white font-black text-lg neon-border">
+                <i class="fa-solid font-bold fa-crown text-xs"></i>
+            </div>
+            <h1 class="font-gamer text-xl lg:text-2xl font-extrabold tracking-wider text-white neon-text uppercase">
+                <span id="tournamentTitleText">ASTRA GAMING</span> <span class="text-brand-pink">- DRAFT</span>
+            </h1>
+        </div>
+
+        <!-- Controles do Header -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div id="turnIndicator" class="hidden sm:flex items-center gap-2 bg-brand-panelBg px-3 py-1.5 rounded border border-brand-pink/40 text-xs font-semibold">
+                <span class="text-gray-400">VEZ DO PICK:</span>
+                <span id="currentTurnTeamText" class="text-brand-pink font-gamer font-bold uppercase">NENHUM</span>
+                <span id="turnCounterBadge" class="bg-brand-pink/20 text-brand-pink border border-brand-pink/50 text-[10px] px-1.5 py-0.5 rounded font-mono ml-1">1/8</span>
+            </div>
+
+            <button id="btnSortear" onclick="sortearOrdem()" class="bg-brand-pink hover:bg-brand-pinkDark text-white font-gamer font-bold px-4 py-2 rounded text-xs sm:text-sm tracking-wider transition-all duration-200 transform hover:scale-105 shadow-md flex items-center gap-2 neon-border">
+                <i class="fa-solid fa-shuffle"></i> SORTEAR ORDEM
+            </button>
+            <button id="btnNextTurn" onclick="proximoTurno()" disabled class="bg-purple-700 hover:bg-purple-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-gamer font-bold px-3 py-2 rounded text-xs sm:text-sm tracking-wider transition-all duration-200 flex items-center gap-1.5" title="Sorteie a ordem antes de avançar">
+                <i class="fa-solid fa-forward"></i> PRÓXIMO
+            </button>
+            <!-- BOTÃO DE CONFIGURAÇÕES DE CORES E DADOS -->
+            <button onclick="openConfigModal()" class="bg-gray-800 hover:bg-gray-700 text-brand-pink font-gamer font-bold px-3 py-2 rounded text-xs sm:text-sm tracking-wider transition-all duration-200 border border-gray-700" title="Configurar Cores, Título e Dados">
+                <i class="fa-solid fa-wrench"></i>
+            </button>
+            <button onclick="resetDraft()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 font-gamer font-bold px-3 py-2 rounded text-xs sm:text-sm tracking-wider transition-all duration-200 border border-gray-700" title="Reiniciar Draft">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- BANNER DA ORDEM SORTEADA DA RODADA -->
+    <div id="orderBanner" class="bg-brand-panelBg border-b border-gray-800 px-4 py-2 hidden overflow-x-auto">
+        <div class="flex items-center gap-2 min-w-max text-xs">
+            <span class="font-gamer text-gray-400 font-bold flex items-center gap-1">
+                <i class="fa-solid fa-list-ol text-brand-pink"></i> ORDEM DOS PICKS:
+            </span>
+            <div id="orderChipsContainer" class="flex items-center gap-2"></div>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO PRINCIPAL (LAYOUT LATERAL + CARDS) -->
+    <main class="flex-1 p-3 sm:p-5 flex flex-col lg:flex-row gap-4 max-w-[1920px] mx-auto w-full">
+        <!-- PAINEL LATERAL: PARTICIPANTES DISPONÍVEIS -->
+        <aside class="w-full lg:w-80 bg-brand-panelBg border-2 border-brand-pink/80 rounded-xl flex flex-col shadow-xl overflow-hidden flex-shrink-0">
+            <div class="bg-brand-pink p-3 text-center shadow-md">
+                <h2 class="font-gamer font-black text-sm sm:text-base text-white tracking-widest uppercase flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-users"></i> PARTICIPANTES DISPONÍVEIS
+                    <span id="playerCountBadge" class="bg-black/40 text-white text-xs px-2 py-0.5 rounded-full font-mono font-bold">0</span>
+                </h2>
+            </div>
+
+            <!-- Campo de Busca -->
+            <div class="p-2 border-b border-gray-800 bg-brand-cardBg">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="filterPlayers()" placeholder="Buscar jogadora..." 
+                        class="w-full bg-brand-darkBg text-xs text-gray-200 pl-8 pr-3 py-2 rounded border border-gray-800 focus:outline-none focus:border-brand-pink transition-all">
+                </div>
+            </div>
+
+            <!-- Container com rolagem da lista -->
+            <div class="p-2 flex-1 overflow-y-auto max-h-[60vh] lg:max-h-[calc(100vh-230px)] space-y-1.5" id="availablePlayersList">
+                <!-- Jogadoras injetadas via JS -->
+            </div>
+
+            <div id="emptyListNotice" class="hidden p-4 text-center text-xs text-gray-500 font-medium">
+                Todas as jogadoras já foram draftadas!
+            </div>
+        </aside>
+
+        <!-- AREA DE CARDS DOS TIMES -->
+        <section class="flex-1">
+            <div id="teamsGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+                <!-- Cards de Times injetados via JS -->
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL SELETOR DE ÍCONES / FUNÇÕES & RANKS (ROLES & RANKS MARVEL RIVALS) -->
+    <div id="iconPickerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-brand-panelBg border-2 border-brand-pink rounded-xl max-w-md w-full p-5 shadow-2xl neon-border relative animate-in fade-in zoom-in-95 duration-200 my-8">
+            <button onclick="closeIconModal()" class="absolute top-3 right-3 text-gray-400 hover:text-white text-base p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="font-gamer text-sm font-bold text-white uppercase tracking-wider mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-brand-pink"></i> Editar Função & Rank
+            </h3>
+            <p id="iconModalTargetText" class="text-xs text-gray-400 mb-4">Escolha a função e o elo para o participante:</p>
+            
+            <!-- Seleção de Roles -->
+            <label class="block text-xs font-bold text-gray-300 mb-2 font-gamer">FUNÇÃO (ROLE):</label>
+            <div id="roleOptionsGrid" class="grid grid-cols-3 gap-2 mb-4">
+                <!-- Injetado por JS -->
+            </div>
+
+            <!-- Seleção de Ranks -->
+            <label class="block text-xs font-bold text-gray-300 mb-2 font-gamer">RANK (ELO MARVEL RIVALS):</label>
+            <div id="rankOptionsGrid" class="grid grid-cols-3 gap-2 mb-5 max-h-48 overflow-y-auto p-1 bg-brand-cardBg rounded border border-gray-800">
+                <!-- Injetado por JS -->
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button onclick="closeIconModal()" class="px-4 py-1.5 rounded bg-brand-pink text-xs font-bold text-white hover:bg-brand-pinkDark transition-all">
+                    Concluir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIGURAÇÕES DE CORES E DADOS DO CAMPEONATO -->
+    <div id="configModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-brand-panelBg border-2 border-brand-pink rounded-xl max-w-xl w-full p-6 shadow-2xl neon-border relative animate-in fade-in zoom-in-95 duration-200 my-8">
+            <button onclick="closeConfigModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-lg p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <h3 class="font-gamer text-base font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2 border-b border-gray-800 pb-2">
+                <i class="fa-solid fa-sliders text-brand-pink"></i> Configurações do Campeonato
+            </h3>
+
+            <!-- Abas ou seções de personalização -->
+            <div class="space-y-5">
+                <!-- 1. Título do Torneio -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-300 font-gamer mb-1">TÍTULO DO TORNEIO:</label>
+                    <input type="text" id="configTournamentTitle" class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-xs text-white outline-none focus:border-brand-pink">
+                </div>
+
+                <!-- 2. Edição de Cores -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-300 font-gamer mb-2">PALETA DE CORES (THEME):</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                            <span class="block text-[10px] text-gray-400 mb-1">Cor Principal (Pink/Neon)</span>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="colorPink" value="#9370db" class="w-8 h-8 rounded bg-transparent cursor-pointer border border-gray-700">
+                                <span id="colorPinkHex" class="text-[10px] font-mono text-gray-300">#9370db</span>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] text-gray-400 mb-1">Fundo Principal</span>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="colorDarkBg" value="#09080e" class="w-8 h-8 rounded bg-transparent cursor-pointer border border-gray-700">
+                                <span id="colorDarkBgHex" class="text-[10px] font-mono text-gray-300">#09080e</span>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] text-gray-400 mb-1">Fundo dos Cards</span>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="colorCardBg" value="#12111a" class="w-8 h-8 rounded bg-transparent cursor-pointer border border-gray-700">
+                                <span id="colorCardBgHex" class="text-[10px] font-mono text-gray-300">#12111a</span>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] text-gray-400 mb-1">Fundo dos Painéis</span>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="colorPanelBg" value="#551a8b" class="w-8 h-8 rounded bg-transparent cursor-pointer border border-gray-700">
+                                <span id="colorPanelBgHex" class="text-[10px] font-mono text-gray-300">#551a8b</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Edição em Massa das Capitãs -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-300 font-gamer mb-1">CAPITÃS / TIMES (1 POR LINHA):</label>
+                    <textarea id="configCaptainsText" rows="3" class="w-full bg-brand-darkBg border border-gray-700 rounded p-2 text-xs text-white outline-none focus:border-brand-pink font-mono"></textarea>
+                </div>
+
+                <!-- 4. Edição em Massa de Jogadoras -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-300 font-gamer mb-1">PARTICIPANTES (1 POR LINHA; RESET LIBERA TODAS):</label>
+                    <textarea id="configPlayersText" rows="5" class="w-full bg-brand-darkBg border border-gray-700 rounded p-2 text-xs text-white outline-none focus:border-brand-pink font-mono"></textarea>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-2 border-t border-gray-800 pt-3">
+                <button onclick="closeConfigModal()" class="px-4 py-2 rounded bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-300">
+                    Cancelar
+                </button>
+                <button onclick="saveConfigModal()" class="px-5 py-2 rounded bg-brand-pink hover:bg-brand-pinkDark text-xs font-bold font-gamer text-white neon-border">
+                    Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER DA APLICAÇÃO -->
+    <footer class="bg-brand-cardBg border-t border-gray-800 px-4 py-2 text-center text-xs text-gray-500 flex flex-wrap justify-between items-center gap-2">
+        <div>ASTRA GAMING DRAFT SYSTEM &copy; 2026 - Desenvolvido para Transmissão de Esports</div>
+        <div class="text-[11px] text-gray-400">Pressione <kbd class="px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-brand-pink font-mono">Espaço</kbd> para passar a vez do pick</div>
+    </footer>
+
+    <!-- LOGICA JAVASCRIPT -->
+    <script>
+        // Ícones de Role Oficiais Marvel Rivals (inspirados em rivalskins.com/assets/role-icons/)
+        const ROLE_ICONS = {
+            vanguard: {
+                name: "Vanguard",
+                color: "#38bdf8", // Cyan
+                svg: `<svg viewBox="0 0 24 24" class="w-4 h-4 fill-current"><path d="M12 2L4 5v6c0 5.25 3.4 10.14 8 11.5 4.6-1.36 8-6.25 8-11.5V5l-8-3zm0 2.18l6 2.25v4.57c0 4.25-2.73 8.21-6 9.35-3.27-1.14-6-5.1-6-9.35V6.43l6-2.25z"/></svg>`
+            },
+            duelist: {
+                name: "Duelist",
+                color: "#ff007f", // Pink Neon
+                svg: `<svg viewBox="0 0 24 24" class="w-4 h-4 fill-current"><path d="M19.7 4.3c-.4-.4-1-.4-1.4 0l-5.3 5.3-2.1-2.1c-.4-.4-1-.4-1.4 0s-.4 1 0 1.4l2.1 2.1-6.3 6.3c-.4.4-.4 1 0 1.4l1.4 1.4c.4.4 1 .4 1.4 0l6.3-6.3 2.1 2.1c.4.4 1 .4 1.4 0s.4-1 0-1.4l-2.1-2.1 5.3-5.3c.4-.4.4-1 0-1.4l-1.4-1.4z"/></svg>`
+            },
+            strategist: {
+                name: "Strategist",
+                color: "#10b981", // Emerald
+                svg: `<svg viewBox="0 0 24 24" class="w-4 h-4 fill-current"><path d="M19 10.5h-5.5V5h-3v5.5H5v3h5.5V19h3v-5.5H19v-3z"/></svg>`
+            }
+        };
+
+        // Ranks Oficiais Marvel Rivals (inspirados em rivalskins.com/assets/rank-logos/)
+        const RANK_ICONS = {
+            bronze: { name: "Bronze", color: "#cd7f32", border: "#8c531b", icon: "fa-shield-cat" },
+            silver: { name: "Silver", color: "#c0c0c0", border: "#808080", icon: "fa-shield-halved" },
+            gold: { name: "Gold", color: "#ffd700", border: "#b8860b", icon: "fa-shield" },
+            platinum: { name: "Platinum", color: "#00ffff", border: "#008b8b", icon: "fa-gem" },
+            diamond: { name: "Diamond", color: "#b9f2ff", border: "#00bfff", icon: "fa-diamond" },
+            grandmaster: { name: "Grandmaster", color: "#ff4500", border: "#8b0000", icon: "fa-bolt" },
+            celestial: { name: "Celestial", color: "#a855f7", border: "#6b21a8", icon: "fa-meteor" },
+            eternity: { name: "Eternity", color: "#ec4899", border: "#be185d", icon: "fa-bahai" },
+            one_above_all: { name: "One Above All", color: "#f59e0b", border: "#d97706", icon: "fa-crown" }
+        };
+
+        // Dados Iniciais
+        let INITIAL_CAPTAINS = [
+            "NYMPHELYSIA", "IAMMARINADINIZ", "RIYUUKA", "PJ_LOBINHO",
+            "FERNANDA_TSTREAM", "IXTELAA", "STAYMISS", "LEAHHZITA"
+        ];
+
+        let INITIAL_PLAYERS = [
+            "AMANDIOCA", "AMETISTALY", "ANATVI", "ANAJ", "ANATHEGAM...", "AULITA", 
+            "AYUMIAR", "BATISTELAZI", "BELOVED", "BIAATIRADORA", "BLOODS2", "BONEMOON", 
+            "BOTAN_TOXICA", "BYSRTN", "CAHNEPO", "CARAMELINHO", "CATRINA_BOSS", "DARII", 
+            "DARKNESSLARI", "DATTEBASTE", "DEFVICKY", "DUDA_DESU", "ECLIPSA", "EMEPINES024...", 
+            "EMYONI", "EUAURORA", "EUSOUNEIDE", "EVEMO...", "FEEHEIKUCHI...", "GOTHIC", 
+            "GABI_B18", "GABS", "GALEGAPAUUSTA", "GGMDF", "GIGIVALENTINE", "GRLPWR", 
+            "HADIYA", "HANAOKA", "HARAJUKUGI...", "HEAVENLYYY...", "HEY_CL...", "HONDA", 
+            "IDKHELL", "ILOVEMMYS2", "JANNITAS", "JERICOSS", "JUBATRIZ", "KAIMI27", 
+            "KAJUNA", "KATRICIA", "KEDELLS", "KIRARA", "KIRRA", "KITSUNENOKIU", 
+            "KOORIQUEEN", "LEAHH_S2", "LLNANNY", "LYCDENIAL", "MARIMARA", "MEGAMOON", 
+            "MILLIE", "MITAKUMO", "MRS_WITCH", "NAMIEIN", "NHXZINHA", "NOAMI", 
+            "NOBREZA", "NOT_THEART...", "PADAWAN_C...", "QCERBERUS", "R_JENNY", "RAIROTACARIN", 
+            "RUEDO_BRAN...", "SISBELOVA", "STORYCHARA", "SZANMAS7", "TENEBRAMH"
+        ];
+
+        let playerRoles = {};
+        let playerRanks = {};
+
+        let availablePlayers = [...INITIAL_PLAYERS];
+        let teams = INITIAL_CAPTAINS.map((cap, index) => ({
+            id: index + 1,
+            captain: cap,
+            name: `TEAM ${cap}`,
+            players: []
+        }));
+
+        let selectedPlayerNick = null;
+        let draftOrder = [];
+        let currentTurnIndex = -1;
+        let iconTargetNick = null;
+        let tournamentTitle = 'ASTRA GAMING';
+        let themeColors = {
+            Pink: '#9370db',
+            DarkBg: '#09080e',
+            CardBg: '#12111a',
+            PanelBg: '#551a8b'
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const roleKeys = Object.keys(ROLE_ICONS);
+            const rankKeys = Object.keys(RANK_ICONS);
+
+            INITIAL_PLAYERS.forEach(nick => {
+                playerRoles[nick] = roleKeys[Math.floor(Math.random() * roleKeys.length)];
+                playerRanks[nick] = rankKeys[Math.floor(Math.random() * rankKeys.length)];
+            });
+
+            renderPlayersList();
+            renderTeams();
+            setupKeyboardShortcuts();
+            setupColorInputs();
+        });
+
+        function getRoleBadge(nick) {
+            const roleKey = playerRoles[nick] || 'duelist';
+            const role = ROLE_ICONS[roleKey] || ROLE_ICONS.duelist;
+            return `<span style="color: ${role.color};" class="inline-flex items-center justify-center flex-shrink-0" title="${role.name}">${role.svg}</span>`;
+        }
+
+        function getRankBadge(nick) {
+            const rankKey = playerRanks[nick] || 'gold';
+            const rank = RANK_ICONS[rankKey] || RANK_ICONS.gold;
+            return `<span style="color: ${rank.color};" class="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 rounded bg-black/40 border border-current" title="${rank.name}">
+                <i class="fa-solid ${rank.icon} text-[8px]"></i>
+            </span>`;
+        }
+
+        // LÓGICA DE DRAFT, SORTEIO E SELEÇÃO
+        function handlePlayerSelect(nick) {
+            if (selectedPlayerNick === nick) {
+                selectedPlayerNick = null;
+            } else {
+                selectedPlayerNick = nick;
+            }
+            renderPlayersList(document.getElementById('searchInput').value);
+            renderTeams();
+        }
+
+        function filterPlayers() {
+            const searchVal = document.getElementById('searchInput').value;
+            renderPlayersList(searchVal);
+        }
+
+        function draftPlayerToTeam(teamIndex) {
+            if (!selectedPlayerNick || !teams[teamIndex] || !availablePlayers.includes(selectedPlayerNick)) return;
+
+            teams[teamIndex].players.push(selectedPlayerNick);
+            availablePlayers = availablePlayers.filter(nick => nick !== selectedPlayerNick);
+            selectedPlayerNick = null;
+
+            if (draftOrder.length > 0 && draftOrder[currentTurnIndex] === teamIndex) {
+                proximoTurno();
+            } else {
+                renderPlayersList(document.getElementById('searchInput').value);
+                renderTeams();
+            }
+        }
+
+        function removerDoTime(teamIndex, playerIndex) {
+            const removed = teams[teamIndex].players.splice(playerIndex, 1)[0];
+            if (removed) {
+                availablePlayers.push(removed);
+                availablePlayers.sort();
+            }
+            renderPlayersList(document.getElementById('searchInput').value);
+            renderTeams();
+        }
+
+        function sortearOrdem() {
+            draftOrder = teams.map((_, i) => i);
+            for (let i = draftOrder.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [draftOrder[i], draftOrder[j]] = [draftOrder[j], draftOrder[i]];
+            }
+            currentTurnIndex = 0;
+            updateTurnDisplay();
+            renderTeams();
+        }
+
+        function proximoTurno() {
+            if (draftOrder.length === 0) return;
+            currentTurnIndex = (currentTurnIndex + 1) % draftOrder.length;
+            updateTurnDisplay();
+            renderTeams();
+        }
+
+        function updateTurnDisplay() {
+            const turnIndicator = document.getElementById('turnIndicator');
+            const turnText = document.getElementById('currentTurnTeamText');
+            const counterBadge = document.getElementById('turnCounterBadge');
+            const orderBanner = document.getElementById('orderBanner');
+            const orderContainer = document.getElementById('orderChipsContainer');
+            const nextTurnButton = document.getElementById('btnNextTurn');
+
+            nextTurnButton.disabled = draftOrder.length === 0;
+            nextTurnButton.title = draftOrder.length === 0 ? 'Sorteie a ordem antes de avançar' : 'Avançar para o próximo time';
+
+            if (draftOrder.length > 0 && currentTurnIndex >= 0) {
+                const currentTeam = teams[draftOrder[currentTurnIndex]];
+                turnIndicator.classList.remove('hidden');
+                turnText.innerText = currentTeam.captain;
+                counterBadge.innerText = `${currentTurnIndex + 1}/${draftOrder.length}`;
+
+                orderBanner.classList.remove('hidden');
+                orderContainer.innerHTML = '';
+
+                draftOrder.forEach((tIdx, pos) => {
+                    const isTurn = pos === currentTurnIndex;
+                    const chip = document.createElement('div');
+                    chip.className = `px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 transition-all ${
+                        isTurn ? 'bg-brand-pink text-white neon-border animate-pulse' : 'bg-brand-cardBg text-gray-400 border border-gray-800'
+                    }`;
+                    chip.innerHTML = `<span class="opacity-60">#${pos + 1}</span> ${teams[tIdx].captain}`;
+                    orderContainer.appendChild(chip);
+                });
+            } else {
+                turnIndicator.classList.add('hidden');
+                orderBanner.classList.add('hidden');
+            }
+        }
+
+        function resetDraft() {
+            availablePlayers = [...INITIAL_PLAYERS];
+            teams.forEach(team => team.players = []);
+            selectedPlayerNick = null;
+            draftOrder = [];
+            currentTurnIndex = -1;
+            document.getElementById('searchInput').value = '';
+            updateTurnDisplay();
+            renderPlayersList();
+            renderTeams();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e, teamIndex) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            const nick = e.dataTransfer.getData('text/plain');
+            if (nick && availablePlayers.includes(nick)) {
+                selectedPlayerNick = nick;
+                draftPlayerToTeam(teamIndex);
+            }
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                const modalOpen = !document.getElementById('configModal').classList.contains('hidden') ||
+                    !document.getElementById('iconPickerModal').classList.contains('hidden');
+                if (e.code === 'Escape') {
+                    closeConfigModal();
+                    closeIconModal();
+                }
+                if (e.code === 'Space' && !modalOpen && !['INPUT', 'TEXTAREA', 'BUTTON'].includes(e.target.tagName)) {
+                    e.preventDefault();
+                    proximoTurno();
+                }
+            });
+        }
+
+        // RENDERIZAÇÃO DA LISTA DE DRAFTADAS
+        function renderPlayersList(filterText = '') {
+            const listContainer = document.getElementById('availablePlayersList');
+            const emptyNotice = document.getElementById('emptyListNotice');
+            const badge = document.getElementById('playerCountBadge');
+            
+            listContainer.innerHTML = '';
+            
+            const filtered = availablePlayers.filter(nick => 
+                nick.toLowerCase().includes(filterText.toLowerCase())
+            );
+
+            badge.innerText = availablePlayers.length;
+
+            if (filtered.length === 0) {
+                emptyNotice.classList.remove('hidden');
+            } else {
+                emptyNotice.classList.add('hidden');
+                filtered.forEach(nick => {
+                    const card = document.createElement('div');
+                    const isSelected = selectedPlayerNick === nick;
+
+                    card.className = `flex items-center justify-between gap-1 px-2 py-1.5 rounded text-xs font-semibold select-none cursor-pointer border transition-all duration-150 group ${
+                        isSelected 
+                        ? 'bg-brand-pink text-white border-white font-bold neon-border-active scale-105 z-10' 
+                        : 'bg-brand-darkBg hover:bg-gray-800 text-gray-200 border-gray-800 hover:border-brand-pink/50'
+                    }`;
+
+                    card.draggable = true;
+                    card.setAttribute('data-nick', nick);
+
+                    card.innerHTML = `
+                        <div class="flex items-center gap-1.5 overflow-hidden">
+                            ${getRoleBadge(nick)}
+                            ${getRankBadge(nick)}
+                            <span class="truncate text-[11px]">${nick}</span>
+                        </div>
+                        <button onclick="openIconModal(event, '${nick}')" title="Alterar Role / Rank"
+                            class="opacity-40 group-hover:opacity-100 hover:text-brand-pink p-0.5 transition-all">
+                            <i class="fa-solid fa-gear text-[10px]"></i>
+                        </button>
+                    `;
+
+                    card.addEventListener('click', (e) => {
+                        if (!e.target.closest('button')) {
+                            handlePlayerSelect(nick);
+                        }
+                    });
+
+                    card.addEventListener('dragstart', (e) => {
+                        card.classList.add('dragging');
+                        e.dataTransfer.setData('text/plain', nick);
+                    });
+
+                    card.addEventListener('dragend', () => {
+                        card.classList.remove('dragging');
+                    });
+
+                    listContainer.appendChild(card);
+                });
+            }
+        }
+
+        // RENDERIZAÇÃO DOS CARDS DOS TIMES
+        function renderTeams() {
+            const grid = document.getElementById('teamsGrid');
+            grid.innerHTML = '';
+
+            teams.forEach((team, teamIndex) => {
+                const isCurrentTurn = (draftOrder.length > 0 && draftOrder[currentTurnIndex] === teamIndex);
+
+                const teamCard = document.createElement('div');
+                teamCard.className = `bg-brand-panelBg border-2 rounded-lg flex flex-col overflow-hidden transition-all duration-300 ${
+                    isCurrentTurn ? 'border-brand-pink active-turn' : 'border-gray-800/90 hover:border-gray-700'
+                }`;
+
+                const headerHtml = `
+                    <div class="bg-brand-cardBg px-3 py-2 border-b border-gray-800 flex justify-between items-center">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <div class="w-6 h-6 rounded-full ${isCurrentTurn ? 'bg-brand-pink text-white font-black scale-110 neon-border-active' : 'bg-brand-pink/20 border border-brand-pink text-brand-pink font-bold'} flex items-center justify-center text-xs transition-all">
+                                ${draftOrder.length > 0 ? (draftOrder.indexOf(teamIndex) + 1) : (teamIndex + 1)}
+                            </div>
+                            <h3 class="font-gamer text-xs sm:text-sm font-bold text-white truncate">${team.name}</h3>
+                        </div>
+                        ${isCurrentTurn ? '<span class="bg-brand-pink text-white text-[9px] font-gamer font-bold px-2 py-0.5 rounded animate-pulse shadow-lg">PICKING</span>' : ''}
+                    </div>
+
+                    <div class="px-3 py-2 bg-gradient-to-r from-brand-cardBg to-brand-panelBg border-b border-gray-800/80 flex items-center justify-between">
+                        <div class="flex items-center gap-2 truncate">
+                            <i class="fa-solid fa-crown text-xs ${isCurrentTurn ? 'text-brand-pink animate-bounce' : 'text-brand-capGold'}"></i>
+                            <span class="text-xs font-bold text-gray-200 truncate">${team.captain}</span>
+                        </div>
+                        <span class="bg-brand-capGold text-black font-extrabold text-[10px] px-1.5 py-0.5 rounded shadow tracking-wider">CAP</span>
+                    </div>
+                `;
+
+                let slotsHtml = `<div class="p-3 flex-1 flex flex-col gap-2 min-h-[220px]" data-team-index="${teamIndex}">`;
+                
+                team.players.forEach((playerNick, pIndex) => {
+                    slotsHtml += `
+                        <div class="flex items-center justify-between bg-brand-darkBg/90 border border-brand-pink/30 hover:border-brand-pink px-2.5 py-1.5 rounded text-xs text-white transition-all group">
+                            <span class="font-medium truncate flex items-center gap-1.5 text-[11px]">
+                                ${getRoleBadge(playerNick)}
+                                ${getRankBadge(playerNick)}
+                                ${playerNick}
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="openIconModal(event, '${playerNick}')" title="Alterar Role / Rank" class="opacity-40 group-hover:opacity-100 text-gray-400 hover:text-brand-pink p-0.5">
+                                    <i class="fa-solid fa-gear text-[10px]"></i>
+                                </button>
+                                <button onclick="removerDoTime(${teamIndex}, ${pIndex})" class="text-gray-500 hover:text-red-400 p-0.5 text-xs" title="Remover de volta para lista">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                slotsHtml += `
+                    <div class="drop-zone flex-1 border-2 border-dashed border-gray-800 hover:border-brand-pink/60 rounded flex items-center justify-center text-gray-600 text-xs py-3 cursor-pointer transition-all min-h-[50px] ${selectedPlayerNick ? 'bg-brand-pink/5 border-brand-pink/40 animate-pulse' : ''}"
+                        onclick="draftPlayerToTeam(${teamIndex})"
+                        ondragover="handleDragOver(event)"
+                        ondragleave="handleDragLeave(event)"
+                        ondrop="handleDrop(event, ${teamIndex})">
+                        <span class="pointer-events-none text-[11px] font-medium text-gray-500 flex items-center gap-1">
+                            ${selectedPlayerNick ? '<i class="fa-solid fa-arrow-down-to-line text-brand-pink"></i> Clique para Draftar' : '<i class="fa-solid fa-plus opacity-40"></i> Slot Livre'}
+                        </span>
+                    </div>
+                `;
+
+                slotsHtml += `</div>`;
+
+                teamCard.innerHTML = headerHtml + slotsHtml;
+                grid.appendChild(teamCard);
+            });
+        }
+
+        // MODAL DE SELEÇÃO DE ROLE & RANK
+        function openIconModal(event, nick) {
+            if (event) event.stopPropagation();
+            iconTargetNick = nick;
+            
+            const modal = document.getElementById('iconPickerModal');
+            const targetText = document.getElementById('iconModalTargetText');
+            const roleGrid = document.getElementById('roleOptionsGrid');
+            const rankGrid = document.getElementById('rankOptionsGrid');
+
+            targetText.innerHTML = `Personalize as informações de <strong>${nick}</strong>:`;
+            roleGrid.innerHTML = '';
+            rankGrid.innerHTML = '';
+
+            const currentRole = playerRoles[nick] || 'duelist';
+            const currentRank = playerRanks[nick] || 'gold';
+
+            // Preenche Roles
+            Object.keys(ROLE_ICONS).forEach(roleKey => {
+                const role = ROLE_ICONS[roleKey];
+                const isSelected = roleKey === currentRole;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `flex flex-col items-center justify-center p-2 rounded border text-center transition-all ${
+                    isSelected ? 'border-brand-pink bg-brand-pink/20 text-white font-bold' : 'border-gray-800 bg-brand-darkBg text-gray-400 hover:border-gray-700'
+                }`;
+
+                btn.innerHTML = `
+                    <div style="color:${role.color}" class="mb-1">${role.svg}</div>
+                    <span class="text-[10px]">${role.name}</span>
+                `;
+                btn.onclick = () => {
+                    playerRoles[nick] = roleKey;
+                    openIconModal(null, nick);
+                };
+                roleGrid.appendChild(btn);
+            });
+
+            // Preenche Ranks
+            Object.keys(RANK_ICONS).forEach(rankKey => {
+                const rank = RANK_ICONS[rankKey];
+                const isSelected = rankKey === currentRank;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `flex items-center gap-1.5 p-1.5 rounded border text-left transition-all ${
+                    isSelected ? 'border-brand-pink bg-brand-pink/20 text-white font-bold' : 'border-gray-800 bg-brand-darkBg text-gray-400 hover:border-gray-700'
+                }`;
+
+                btn.innerHTML = `
+                    <i class="fa-solid ${rank.icon} text-xs" style="color:${rank.color}"></i>
+                    <span class="text-[10px] truncate">${rank.name}</span>
+                `;
+                btn.onclick = () => {
+                    playerRanks[nick] = rankKey;
+                    openIconModal(null, nick);
+                };
+                rankGrid.appendChild(btn);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeIconModal() {
+            document.getElementById('iconPickerModal').classList.add('hidden');
+            iconTargetNick = null;
+            renderPlayersList(document.getElementById('searchInput').value);
+            renderTeams();
+        }
+
+        // CONFIGURAÇÕES DO CAMPEONATO (CORES, TITULO, CAPITAS E JOGADORAS)
+        function openConfigModal() {
+            document.getElementById('configTournamentTitle').value = tournamentTitle;
+            document.getElementById('configCaptainsText').value = teams.map(t => t.captain).join('\n');
+            document.getElementById('configPlayersText').value = INITIAL_PLAYERS.join('\n');
+            Object.entries(themeColors).forEach(([key, value]) => {
+                document.getElementById(`color${key}`).value = value;
+                document.getElementById(`color${key}Hex`).innerText = value;
+            });
+            document.getElementById('configModal').classList.remove('hidden');
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').classList.add('hidden');
+        }
+
+        function saveConfigModal() {
+            const newCaptains = [...new Set(document.getElementById('configCaptainsText').value
+                .split('\n').map(captain => captain.trim().toUpperCase()).filter(Boolean))];
+            if (newCaptains.length === 0) {
+                alert('Informe pelo menos uma capitã para continuar.');
+                return;
+            }
+
+            const newPlayers = [...new Set(document.getElementById('configPlayersText').value
+                .split('\n').map(player => player.trim().toUpperCase()).filter(Boolean))];
+            const oldCaptains = teams.map(team => team.captain);
+            const roster = new Set(newPlayers);
+            const assignedPlayers = new Set();
+
+            teams = newCaptains.map((captain, index) => {
+                const players = (teams[index]?.players || []).filter(player => roster.has(player) && !assignedPlayers.has(player));
+                players.forEach(player => assignedPlayers.add(player));
+                return { id: index + 1, captain, name: `TEAM ${captain}`, players };
+            });
+
+            INITIAL_CAPTAINS = newCaptains;
+            INITIAL_PLAYERS = newPlayers;
+            availablePlayers = newPlayers.filter(player => !assignedPlayers.has(player));
+            if (selectedPlayerNick && !availablePlayers.includes(selectedPlayerNick)) selectedPlayerNick = null;
+
+            const newTitle = document.getElementById('configTournamentTitle').value.trim();
+            if (newTitle) tournamentTitle = newTitle;
+            document.getElementById('tournamentTitleText').textContent = tournamentTitle;
+
+            themeColors = {
+                Pink: document.getElementById('colorPink').value,
+                DarkBg: document.getElementById('colorDarkBg').value,
+                CardBg: document.getElementById('colorCardBg').value,
+                PanelBg: document.getElementById('colorPanelBg').value
+            };
+            Object.entries(themeColors).forEach(([key, value]) => {
+                const [red, green, blue] = value.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16));
+                const variable = {
+                    Pink: '--color-pink-rgb',
+                    DarkBg: '--color-dark-bg-rgb',
+                    CardBg: '--color-card-bg-rgb',
+                    PanelBg: '--color-panel-bg-rgb'
+                }[key];
+                document.documentElement.style.setProperty(variable, `${red} ${green} ${blue}`);
+            });
+
+            const roleKeys = Object.keys(ROLE_ICONS);
+            const rankKeys = Object.keys(RANK_ICONS);
+            newPlayers.forEach(player => {
+                if (!playerRoles[player]) playerRoles[player] = roleKeys[Math.floor(Math.random() * roleKeys.length)];
+                if (!playerRanks[player]) playerRanks[player] = rankKeys[Math.floor(Math.random() * rankKeys.length)];
+            });
+
+            if (oldCaptains.length !== newCaptains.length || oldCaptains.some((captain, index) => captain !== newCaptains[index])) {
+                draftOrder = [];
+                currentTurnIndex = -1;
+            }
+
+            closeConfigModal();
+            updateTurnDisplay();
+            renderPlayersList();
+            renderTeams();
+        }
+
+        function setupColorInputs() {
+            ['Pink', 'DarkBg', 'CardBg', 'PanelBg'].forEach(key => {
+                const input = document.getElementById(`color${key}`);
+                const label = document.getElementById(`color${key}Hex`);
+                if (input && label) {
+                    input.addEventListener('input', (e) => {
+                        label.innerText = e.target.value;
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
