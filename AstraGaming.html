@@ -10,8 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Bebas Neue:wght@600;800;900&display=swap" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./supabase-config.js"></script>
 
     <script>
         tailwind.config = {
@@ -258,8 +256,6 @@
                 <i class="fa-solid fa-xmark"></i>
             </button>
             <h3 class="font-gamer text-sm font-bold text-white mb-4">ACESSO ADMINISTRATIVO</h3>
-            <label for="adminEmailInput" class="block text-xs font-bold text-gray-300 mb-1">E-MAIL</label>
-            <input id="adminEmailInput" type="email" autocomplete="username" required class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink mb-4">
             <label for="adminPasswordInput" class="block text-xs font-bold text-gray-300 mb-1">SENHA</label>
             <input id="adminPasswordInput" type="password" autocomplete="current-password" required class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink mb-3">
             <p id="adminLoginStatus" role="status" class="text-xs text-amber-300 min-h-5 mb-3"></p>
@@ -465,8 +461,7 @@
         let currentView = 'draft';
         let isAdminMode = false;
         let editingProfileNick = null;
-        let supabaseClient = null;
-        let adminUser = null;
+        let stateWriteQueue = Promise.resolve();
 
         document.addEventListener('DOMContentLoaded', async () => {
             restoreSavedState();
@@ -485,8 +480,7 @@
             renderProfiles();
             setupKeyboardShortcuts();
             setupColorInputs();
-            persistAppState();
-            await initializeSupabase();
+            await loadSharedState();
         });
 
         function restoreSavedState() {
@@ -531,49 +525,33 @@
                 console.warn('Não foi possível salvar os dados neste navegador.', error);
             }
 
-            if (supabaseClient && adminUser && isAdminMode) {
-                supabaseClient.from('astra_state').upsert({ id: 'main', state })
-                    .then(({ error }) => {
-                        if (error) {
-                            console.error('Falha ao salvar no Supabase.', error);
-                            document.getElementById('profileViewNotice').textContent = 'Não foi possível salvar no servidor. Verifique a configuração do Supabase.';
-                        }
+            if (isAdminMode) {
+                stateWriteQueue = stateWriteQueue.then(async () => {
+                    const response = await fetch('/api/state', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ state })
                     });
+                    if (!response.ok) throw new Error('Falha ao salvar no Vercel Blob.');
+                }).catch(error => {
+                    console.error('Falha ao salvar os dados compartilhados.', error);
+                    document.getElementById('profileViewNotice').textContent = 'Não foi possível salvar no Vercel. Verifique a configuração de armazenamento.';
+                });
             }
-        }
-
-        async function initializeSupabase() {
-            const config = window.ASTRA_SUPABASE_CONFIG;
-            if (!window.supabase?.createClient || !config?.url || !config?.anonKey) {
-                document.getElementById('btnAdminMode').title = 'Configure supabase-config.js para habilitar o login seguro';
-                return;
-            }
-
-            supabaseClient = window.supabase.createClient(config.url, config.anonKey);
-            const { data, error } = await supabaseClient.auth.getSession();
-            if (error) console.error('Falha ao validar a sessão Supabase.', error);
-            if (data?.session?.user && data.session.user.app_metadata?.role === 'admin') {
-                adminUser = data.session.user;
-            }
-            updateAdminUi();
-            await loadSharedState();
         }
 
         async function loadSharedState() {
-            if (!supabaseClient) return;
-            const { data, error } = await supabaseClient.from('astra_state').select('state').eq('id', 'main').maybeSingle();
-            if (error) {
-                console.error('Falha ao carregar os dados compartilhados.', error);
-                document.getElementById('profileViewNotice').textContent = 'Configure a tabela e as políticas RLS seguindo SUPABASE_SETUP.md.';
-                return;
-            }
-            if (!data?.state) {
-                if (adminUser && isAdminMode) persistAppState();
-                return;
-            }
-
             try {
-                localStorage.setItem('astraDraftState', JSON.stringify(data.state));
+                const response = await fetch('/api/state', { cache: 'no-store' });
+                if (!response.ok) throw new Error('Falha ao carregar estado compartilhado.');
+                const { state } = await response.json();
+                if (!state) {
+                    if (isAdminMode) persistAppState();
+                    return;
+                }
+
+                localStorage.setItem('astraDraftState', JSON.stringify(state));
                 restoreSavedState();
                 applyThemeColors();
                 updateTurnDisplay();
@@ -581,16 +559,19 @@
                 renderTeams();
                 renderProfiles();
             } catch (error) {
-                console.error('Falha ao aplicar os dados compartilhados.', error);
+                console.error('Falha ao carregar os dados compartilhados do Vercel.', error);
+                if (location.protocol !== 'file:') {
+                    document.getElementById('profileViewNotice').textContent = 'Não foi possível carregar os dados compartilhados do Vercel.';
+                }
             }
         }
 
         function openAdminLoginModal() {
-            document.getElementById('adminLoginStatus').textContent = supabaseClient
-                ? ''
-                : 'Configure URL e chave pública em supabase-config.js antes de entrar.';
+            document.getElementById('adminLoginStatus').textContent = location.protocol === 'file:'
+                ? 'O acesso Admin funciona quando o site estiver publicado na Vercel.'
+                : '';
             document.getElementById('adminLoginModal').classList.remove('hidden');
-            if (supabaseClient) document.getElementById('adminEmailInput').focus();
+            if (location.protocol !== 'file:') document.getElementById('adminPasswordInput').focus();
         }
 
         function closeAdminLoginModal() {
@@ -601,63 +582,64 @@
             event.preventDefault();
             const status = document.getElementById('adminLoginStatus');
             const submitButton = document.getElementById('btnAdminLoginSubmit');
-            if (!supabaseClient) {
-                status.textContent = 'Supabase ainda não está configurado.';
+            if (location.protocol === 'file:') {
+                status.textContent = 'O acesso Admin funciona somente no site publicado na Vercel.';
                 return;
             }
 
             submitButton.disabled = true;
             status.textContent = 'Validando acesso...';
-            const { data, error } = await supabaseClient.auth.signInWithPassword({
-                email: document.getElementById('adminEmailInput').value.trim(),
-                password: document.getElementById('adminPasswordInput').value
-            });
-            submitButton.disabled = false;
+            try {
+                const response = await fetch('/api/admin-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ password: document.getElementById('adminPasswordInput').value })
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    status.textContent = result.error || 'Senha inválida.';
+                    return;
+                }
 
-            if (error) {
-                status.textContent = 'E-mail ou senha inválidos.';
-                return;
+                isAdminMode = true;
+                document.getElementById('adminPasswordInput').value = '';
+                closeAdminLoginModal();
+                updateAdminUi();
+                await loadSharedState();
+            } catch (error) {
+                console.error('Falha ao autenticar o Admin.', error);
+                status.textContent = 'Não foi possível conectar à Vercel.';
+            } finally {
+                submitButton.disabled = false;
             }
-            if (data.user.app_metadata?.role !== 'admin') {
-                await supabaseClient.auth.signOut();
-                status.textContent = 'Esta conta não tem permissão de administrador.';
-                return;
-            }
-
-            adminUser = data.user;
-            isAdminMode = true;
-            document.getElementById('adminPasswordInput').value = '';
-            closeAdminLoginModal();
-            updateAdminUi();
-            await loadSharedState();
-            updateAdminUi();
         }
 
         async function logoutAdmin() {
-            if (supabaseClient) await supabaseClient.auth.signOut();
-            adminUser = null;
+            try {
+                await fetch('/api/admin-login', { method: 'DELETE', credentials: 'same-origin' });
+            } catch (error) {
+                console.error('Falha ao encerrar a sessão Admin.', error);
+            }
             isAdminMode = false;
             updateAdminUi();
         }
 
         function updateAdminUi() {
-            const hasAdminSession = Boolean(adminUser);
-            const canEdit = hasAdminSession && isAdminMode;
+            const canEdit = isAdminMode;
             const button = document.getElementById('btnAdminMode');
             button.setAttribute('aria-pressed', String(canEdit));
             button.innerHTML = `<i class="fa-solid fa-user-shield mr-1"></i> ${canEdit ? 'ADMIN ATIVO' : 'ADMIN'}`;
             button.className = canEdit
                 ? 'px-3 py-1.5 rounded text-xs font-bold bg-emerald-700 text-white border-l border-gray-700'
                 : 'px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800 border-l border-gray-700';
-            button.title = hasAdminSession ? 'Ativar ou desativar edição administrativa' : 'Entrar como administrador';
-            document.getElementById('btnAdminLogout').classList.toggle('hidden', !hasAdminSession);
+            button.title = canEdit ? 'Desativar edição administrativa' : 'Entrar como administrador';
+            document.getElementById('btnAdminLogout').classList.toggle('hidden', !canEdit);
             document.getElementById('btnConfig').disabled = !canEdit;
             document.getElementById('btnAddProfile').classList.toggle('hidden', !canEdit);
             document.getElementById('profileViewNotice').textContent = canEdit
-                ? `Admin autenticado: ${adminUser.email}. Alterações são compartilhadas.`
-                : hasAdminSession
-                    ? 'Sessão administrativa válida. Ative ADMIN para editar.'
-                    : 'Visualização dos perfis cadastrados.';
+                ? 'Admin autenticado. Alterações são compartilhadas com todos.'
+                : 'Visualização dos perfis cadastrados.';
             renderProfiles();
             renderPlayersList(document.getElementById('searchInput').value);
             renderTeams();
@@ -710,12 +692,11 @@
         }
 
         function toggleAdminMode() {
-            if (!supabaseClient || !adminUser) {
-                openAdminLoginModal();
+            if (isAdminMode) {
+                logoutAdmin();
                 return;
             }
-            isAdminMode = !isAdminMode;
-            updateAdminUi();
+            openAdminLoginModal();
         }
 
         function renderProfiles() {
