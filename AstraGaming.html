@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Bebas Neue:wght@600;800;900&display=swap" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
 
     <script>
         tailwind.config = {
@@ -23,7 +25,7 @@
                             pink: 'rgb(var(--color-pink-rgb) / <alpha-value>)',
                             pinkDark: '#551A8B',
                             pinkGlow: 'rgba(39, 64, 139)',
-                            capGold: '#fbbf24',
+                            capGold: '#fbbf24'
                         }
                     },
                     fontFamily: {
@@ -32,7 +34,8 @@
                     }
                 }
             }
-        }
+        };
+    </script>
     </script>
 
     <style>
@@ -89,6 +92,25 @@
             animation: pulseGlow 1.8s infinite ease-in-out;
             border-color: #a200ff !important;
         }
+        .pick-card-in {
+            animation: drawNameIn 360ms ease-out both;
+            animation-delay: var(--pick-order-delay, 0ms);
+        }
+        .active-turn.pick-card-in {
+            animation: pulseGlow 1.8s infinite ease-in-out, drawNameIn 360ms ease-out both;
+            animation-delay: 0s, var(--pick-order-delay, 0ms);
+        }
+
+        @keyframes drawNameIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .draw-name-in {
+            animation: drawNameIn 360ms ease-out both;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .draw-name-in, .pick-card-in, .active-turn, .active-turn.pick-card-in { animation: none; }
+        }
     </style>
 </head>
 <body class="bg-brand-darkBg text-gray-100 font-body min-h-screen flex flex-col antialiased selection:bg-brand-pink selection:text-white">
@@ -104,8 +126,23 @@
             </h1>
         </div>
 
+        <nav class="flex items-center gap-1 border border-gray-700 rounded p-1" aria-label="Navegação principal">
+            <button id="viewDraftButton" onclick="switchView('draft')" class="px-3 py-1.5 rounded text-xs font-bold bg-brand-pink text-white" aria-current="page">
+                <i class="fa-solid fa-shuffle mr-1"></i> DRAFT
+            </button>
+            <button id="viewProfilesButton" onclick="switchView('profiles')" class="px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800">
+                <i class="fa-solid fa-id-card mr-1"></i> PERFIS
+            </button>
+            <button id="btnAdminMode" onclick="toggleAdminMode()" class="px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800 border-l border-gray-700" aria-pressed="false" title="Ativar modo de edição local">
+                <i class="fa-solid fa-user-shield mr-1"></i> ADMIN
+            </button>
+            <button id="btnAdminLogout" onclick="logoutAdmin()" class="hidden px-2 py-1.5 rounded text-xs font-bold text-red-300 hover:bg-red-950" title="Sair da conta administrativa">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+        </nav>
+
         <!-- Controles do Header -->
-        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div id="draftHeaderControls" class="flex flex-wrap items-center gap-2 sm:gap-3">
             <div id="turnIndicator" class="hidden sm:flex items-center gap-2 bg-brand-panelBg px-3 py-1.5 rounded border border-brand-pink/40 text-xs font-semibold">
                 <span class="text-gray-400">VEZ DO PICK:</span>
                 <span id="currentTurnTeamText" class="text-brand-pink font-gamer font-bold uppercase">NENHUM</span>
@@ -119,7 +156,7 @@
                 <i class="fa-solid fa-forward"></i> PRÓXIMO
             </button>
             <!-- BOTÃO DE CONFIGURAÇÕES DE CORES E DADOS -->
-            <button onclick="openConfigModal()" class="bg-gray-800 hover:bg-gray-700 text-brand-pink font-gamer font-bold px-3 py-2 rounded text-xs sm:text-sm tracking-wider transition-all duration-200 border border-gray-700" title="Configurar Cores, Título e Dados">
+            <button id="btnConfig" onclick="openConfigModal()" disabled class="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-brand-pink font-gamer font-bold px-3 py-2 rounded text-xs sm:text-sm tracking-wider transition-all duration-200 border border-gray-700" title="Ative o modo Admin para configurar o campeonato">
                 <i class="fa-solid fa-wrench"></i>
             </button>
             <button onclick="resetDraft()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 font-gamer font-bold px-3 py-2 rounded text-xs sm:text-sm tracking-wider transition-all duration-200 border border-gray-700" title="Reiniciar Draft">
@@ -139,7 +176,7 @@
     </div>
 
     <!-- CONTEÚDO PRINCIPAL (LAYOUT LATERAL + CARDS) -->
-    <main class="flex-1 p-3 sm:p-5 flex flex-col lg:flex-row gap-4 max-w-[1920px] mx-auto w-full">
+    <main id="draftView" class="flex-1 p-3 sm:p-5 flex flex-col lg:flex-row gap-4 max-w-[1920px] mx-auto w-full">
         <!-- PAINEL LATERAL: PARTICIPANTES DISPONÍVEIS -->
         <aside class="w-full lg:w-80 bg-brand-panelBg border-2 border-brand-pink/80 rounded-xl flex flex-col shadow-xl overflow-hidden flex-shrink-0">
             <div class="bg-brand-pink p-3 text-center shadow-md">
@@ -175,6 +212,62 @@
             </div>
         </section>
     </main>
+
+    <main id="profilesView" class="hidden flex-1 p-3 sm:p-5 max-w-[1920px] mx-auto w-full">
+        <section class="w-full">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-4 mb-4">
+                <div>
+                    <h2 class="font-gamer text-lg font-bold text-white">PERFIS DE PARTICIPANTES</h2>
+                    <p id="profileViewNotice" class="text-xs text-gray-400 mt-1">Visualização dos perfis cadastrados.</p>
+                </div>
+                <button id="btnAddProfile" onclick="openProfileModal()" class="hidden bg-brand-pink hover:bg-brand-pinkDark text-white font-bold px-3 py-2 rounded text-xs">
+                    <i class="fa-solid fa-user-plus mr-1"></i> NOVO PERFIL
+                </button>
+            </div>
+            <div class="relative max-w-sm mb-4">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-xs"></i>
+                <input type="search" id="profileSearchInput" oninput="renderProfiles()" placeholder="Buscar participante..." class="w-full bg-brand-cardBg text-xs text-gray-200 pl-8 pr-3 py-2 rounded border border-gray-800 focus:outline-none focus:border-brand-pink">
+            </div>
+            <div id="profilesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"></div>
+            <p id="emptyProfilesNotice" class="hidden py-10 text-center text-sm text-gray-500">Nenhum perfil encontrado.</p>
+        </section>
+    </main>
+
+    <div id="profileModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-brand-panelBg border-2 border-brand-pink rounded-lg max-w-md w-full p-5 shadow-2xl relative">
+            <button onclick="closeProfileModal()" class="absolute top-3 right-3 text-gray-400 hover:text-white" aria-label="Fechar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 id="profileModalTitle" class="font-gamer text-sm font-bold text-white mb-4">EDITAR PERFIL</h3>
+            <label for="profileNameInput" class="block text-xs font-bold text-gray-300 mb-1">NICK</label>
+            <input id="profileNameInput" maxlength="40" class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink mb-4">
+            <label for="profileRoleSelect" class="block text-xs font-bold text-gray-300 mb-1">FUNÇÃO</label>
+            <select id="profileRoleSelect" class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white mb-4"></select>
+            <label for="profileRankSelect" class="block text-xs font-bold text-gray-300 mb-1">RANK</label>
+            <select id="profileRankSelect" class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white mb-5"></select>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeProfileModal()" class="px-3 py-2 rounded bg-gray-800 text-xs font-bold text-gray-300">Cancelar</button>
+                <button onclick="saveProfile()" class="px-4 py-2 rounded bg-brand-pink text-xs font-bold text-white">Salvar perfil</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminLoginModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <form onsubmit="submitAdminLogin(event)" class="bg-brand-panelBg border-2 border-brand-pink rounded-lg max-w-sm w-full p-5 shadow-2xl relative">
+            <button type="button" onclick="closeAdminLoginModal()" class="absolute top-3 right-3 text-gray-400 hover:text-white" aria-label="Fechar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="font-gamer text-sm font-bold text-white mb-4">ACESSO ADMINISTRATIVO</h3>
+            <label for="adminEmailInput" class="block text-xs font-bold text-gray-300 mb-1">E-MAIL</label>
+            <input id="adminEmailInput" type="email" autocomplete="username" required class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink mb-4">
+            <label for="adminPasswordInput" class="block text-xs font-bold text-gray-300 mb-1">SENHA</label>
+            <input id="adminPasswordInput" type="password" autocomplete="current-password" required class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink mb-3">
+            <p id="adminLoginStatus" role="status" class="text-xs text-amber-300 min-h-5 mb-3"></p>
+            <button id="btnAdminLoginSubmit" type="submit" class="w-full bg-brand-pink hover:bg-brand-pinkDark text-white font-bold px-4 py-2 rounded text-xs">
+                ENTRAR
+            </button>
+        </form>
+    </div>
 
     <!-- MODAL SELETOR DE ÍCONES / FUNÇÕES & RANKS (ROLES & RANKS MARVEL RIVALS) -->
     <div id="iconPickerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -369,21 +462,371 @@
             CardBg: '#12111a',
             PanelBg: '#551a8b'
         };
+        let currentView = 'draft';
+        let isAdminMode = false;
+        let editingProfileNick = null;
+        let supabaseClient = null;
+        let adminUser = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            restoreSavedState();
             const roleKeys = Object.keys(ROLE_ICONS);
             const rankKeys = Object.keys(RANK_ICONS);
 
             INITIAL_PLAYERS.forEach(nick => {
-                playerRoles[nick] = roleKeys[Math.floor(Math.random() * roleKeys.length)];
-                playerRanks[nick] = rankKeys[Math.floor(Math.random() * rankKeys.length)];
+                if (!playerRoles[nick]) playerRoles[nick] = roleKeys[Math.floor(Math.random() * roleKeys.length)];
+                if (!playerRanks[nick]) playerRanks[nick] = rankKeys[Math.floor(Math.random() * rankKeys.length)];
             });
 
+            initializeProfileFormOptions();
+            applyThemeColors();
             renderPlayersList();
             renderTeams();
+            renderProfiles();
             setupKeyboardShortcuts();
             setupColorInputs();
+            persistAppState();
+            await initializeSupabase();
         });
+
+        function restoreSavedState() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('astraDraftState') || 'null');
+                if (!saved) return;
+
+                if (Array.isArray(saved.captains) && saved.captains.length) INITIAL_CAPTAINS = saved.captains;
+                if (Array.isArray(saved.players)) INITIAL_PLAYERS = [...new Set(saved.players)];
+                if (saved.roles && typeof saved.roles === 'object') playerRoles = saved.roles;
+                if (saved.ranks && typeof saved.ranks === 'object') playerRanks = saved.ranks;
+                if (typeof saved.title === 'string' && saved.title.trim()) tournamentTitle = saved.title;
+                if (saved.colors && typeof saved.colors === 'object') themeColors = { ...themeColors, ...saved.colors };
+
+                const roster = new Set(INITIAL_PLAYERS);
+                const assigned = new Set();
+                teams = INITIAL_CAPTAINS.map((captain, index) => {
+                    const players = (saved.teams?.[index]?.players || []).filter(player => roster.has(player) && !assigned.has(player));
+                    players.forEach(player => assigned.add(player));
+                    return { id: index + 1, captain, name: `TEAM ${captain}`, players };
+                });
+                availablePlayers = INITIAL_PLAYERS.filter(player => !assigned.has(player));
+            } catch (error) {
+                console.warn('Não foi possível carregar os dados salvos.', error);
+            }
+        }
+
+        function persistAppState() {
+            const state = {
+                captains: INITIAL_CAPTAINS,
+                players: INITIAL_PLAYERS,
+                availablePlayers,
+                teams,
+                roles: playerRoles,
+                ranks: playerRanks,
+                title: tournamentTitle,
+                colors: themeColors
+            };
+            try {
+                localStorage.setItem('astraDraftState', JSON.stringify(state));
+            } catch (error) {
+                console.warn('Não foi possível salvar os dados neste navegador.', error);
+            }
+
+            if (supabaseClient && adminUser && isAdminMode) {
+                supabaseClient.from('astra_state').upsert({ id: 'main', state })
+                    .then(({ error }) => {
+                        if (error) {
+                            console.error('Falha ao salvar no Supabase.', error);
+                            document.getElementById('profileViewNotice').textContent = 'Não foi possível salvar no servidor. Verifique a configuração do Supabase.';
+                        }
+                    });
+            }
+        }
+
+        async function initializeSupabase() {
+            const config = window.ASTRA_SUPABASE_CONFIG;
+            if (!window.supabase?.createClient || !config?.url || !config?.anonKey) {
+                document.getElementById('btnAdminMode').title = 'Configure supabase-config.js para habilitar o login seguro';
+                return;
+            }
+
+            supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+            const { data, error } = await supabaseClient.auth.getSession();
+            if (error) console.error('Falha ao validar a sessão Supabase.', error);
+            if (data?.session?.user && data.session.user.app_metadata?.role === 'admin') {
+                adminUser = data.session.user;
+            }
+            updateAdminUi();
+            await loadSharedState();
+        }
+
+        async function loadSharedState() {
+            if (!supabaseClient) return;
+            const { data, error } = await supabaseClient.from('astra_state').select('state').eq('id', 'main').maybeSingle();
+            if (error) {
+                console.error('Falha ao carregar os dados compartilhados.', error);
+                document.getElementById('profileViewNotice').textContent = 'Configure a tabela e as políticas RLS seguindo SUPABASE_SETUP.md.';
+                return;
+            }
+            if (!data?.state) {
+                if (adminUser && isAdminMode) persistAppState();
+                return;
+            }
+
+            try {
+                localStorage.setItem('astraDraftState', JSON.stringify(data.state));
+                restoreSavedState();
+                applyThemeColors();
+                updateTurnDisplay();
+                renderPlayersList();
+                renderTeams();
+                renderProfiles();
+            } catch (error) {
+                console.error('Falha ao aplicar os dados compartilhados.', error);
+            }
+        }
+
+        function openAdminLoginModal() {
+            document.getElementById('adminLoginStatus').textContent = supabaseClient
+                ? ''
+                : 'Configure URL e chave pública em supabase-config.js antes de entrar.';
+            document.getElementById('adminLoginModal').classList.remove('hidden');
+            if (supabaseClient) document.getElementById('adminEmailInput').focus();
+        }
+
+        function closeAdminLoginModal() {
+            document.getElementById('adminLoginModal').classList.add('hidden');
+        }
+
+        async function submitAdminLogin(event) {
+            event.preventDefault();
+            const status = document.getElementById('adminLoginStatus');
+            const submitButton = document.getElementById('btnAdminLoginSubmit');
+            if (!supabaseClient) {
+                status.textContent = 'Supabase ainda não está configurado.';
+                return;
+            }
+
+            submitButton.disabled = true;
+            status.textContent = 'Validando acesso...';
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: document.getElementById('adminEmailInput').value.trim(),
+                password: document.getElementById('adminPasswordInput').value
+            });
+            submitButton.disabled = false;
+
+            if (error) {
+                status.textContent = 'E-mail ou senha inválidos.';
+                return;
+            }
+            if (data.user.app_metadata?.role !== 'admin') {
+                await supabaseClient.auth.signOut();
+                status.textContent = 'Esta conta não tem permissão de administrador.';
+                return;
+            }
+
+            adminUser = data.user;
+            isAdminMode = true;
+            document.getElementById('adminPasswordInput').value = '';
+            closeAdminLoginModal();
+            updateAdminUi();
+            await loadSharedState();
+            updateAdminUi();
+        }
+
+        async function logoutAdmin() {
+            if (supabaseClient) await supabaseClient.auth.signOut();
+            adminUser = null;
+            isAdminMode = false;
+            updateAdminUi();
+        }
+
+        function updateAdminUi() {
+            const hasAdminSession = Boolean(adminUser);
+            const canEdit = hasAdminSession && isAdminMode;
+            const button = document.getElementById('btnAdminMode');
+            button.setAttribute('aria-pressed', String(canEdit));
+            button.innerHTML = `<i class="fa-solid fa-user-shield mr-1"></i> ${canEdit ? 'ADMIN ATIVO' : 'ADMIN'}`;
+            button.className = canEdit
+                ? 'px-3 py-1.5 rounded text-xs font-bold bg-emerald-700 text-white border-l border-gray-700'
+                : 'px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800 border-l border-gray-700';
+            button.title = hasAdminSession ? 'Ativar ou desativar edição administrativa' : 'Entrar como administrador';
+            document.getElementById('btnAdminLogout').classList.toggle('hidden', !hasAdminSession);
+            document.getElementById('btnConfig').disabled = !canEdit;
+            document.getElementById('btnAddProfile').classList.toggle('hidden', !canEdit);
+            document.getElementById('profileViewNotice').textContent = canEdit
+                ? `Admin autenticado: ${adminUser.email}. Alterações são compartilhadas.`
+                : hasAdminSession
+                    ? 'Sessão administrativa válida. Ative ADMIN para editar.'
+                    : 'Visualização dos perfis cadastrados.';
+            renderProfiles();
+            renderPlayersList(document.getElementById('searchInput').value);
+            renderTeams();
+        }
+
+        function applyThemeColors() {
+            const variables = {
+                Pink: '--color-pink-rgb',
+                DarkBg: '--color-dark-bg-rgb',
+                CardBg: '--color-card-bg-rgb',
+                PanelBg: '--color-panel-bg-rgb'
+            };
+            Object.entries(variables).forEach(([key, variable]) => {
+                const channels = themeColors[key].match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16));
+                document.documentElement.style.setProperty(variable, channels.join(' '));
+            });
+            document.getElementById('tournamentTitleText').textContent = tournamentTitle;
+        }
+
+        function initializeProfileFormOptions() {
+            Object.entries(ROLE_ICONS).forEach(([key, role]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = role.name;
+                document.getElementById('profileRoleSelect').appendChild(option);
+            });
+            Object.entries(RANK_ICONS).forEach(([key, rank]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = rank.name;
+                document.getElementById('profileRankSelect').appendChild(option);
+            });
+        }
+
+        function switchView(view) {
+            currentView = view === 'profiles' ? 'profiles' : 'draft';
+            document.getElementById('draftView').classList.toggle('hidden', currentView !== 'draft');
+            document.getElementById('profilesView').classList.toggle('hidden', currentView !== 'profiles');
+            document.getElementById('draftHeaderControls').classList.toggle('hidden', currentView !== 'draft');
+            document.getElementById('viewDraftButton').className = currentView === 'draft'
+                ? 'px-3 py-1.5 rounded text-xs font-bold bg-brand-pink text-white'
+                : 'px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800';
+            document.getElementById('viewProfilesButton').className = currentView === 'profiles'
+                ? 'px-3 py-1.5 rounded text-xs font-bold bg-brand-pink text-white'
+                : 'px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800';
+            document.getElementById('viewDraftButton').toggleAttribute('aria-current', currentView === 'draft');
+            document.getElementById('viewProfilesButton').toggleAttribute('aria-current', currentView === 'profiles');
+            document.getElementById('orderBanner').classList.toggle('hidden', currentView !== 'draft' || draftOrder.length === 0);
+            renderProfiles();
+        }
+
+        function toggleAdminMode() {
+            if (!supabaseClient || !adminUser) {
+                openAdminLoginModal();
+                return;
+            }
+            isAdminMode = !isAdminMode;
+            updateAdminUi();
+        }
+
+        function renderProfiles() {
+            const grid = document.getElementById('profilesGrid');
+            const emptyNotice = document.getElementById('emptyProfilesNotice');
+            const search = document.getElementById('profileSearchInput')?.value.trim().toLowerCase() || '';
+            const profiles = INITIAL_PLAYERS.filter(nick => nick.toLowerCase().includes(search));
+            grid.replaceChildren();
+            emptyNotice.classList.toggle('hidden', profiles.length > 0);
+
+            profiles.forEach(nick => {
+                const card = document.createElement('article');
+                card.className = 'bg-brand-panelBg border border-gray-800 rounded-lg p-4 flex flex-col gap-3';
+                const identity = document.createElement('div');
+                identity.className = 'flex items-center gap-2 min-w-0';
+                identity.innerHTML = `${getRoleBadge(nick)}${getRankBadge(nick)}`;
+                const name = document.createElement('h3');
+                name.className = 'font-gamer text-sm font-bold text-white truncate';
+                name.textContent = nick;
+                identity.appendChild(name);
+                card.appendChild(identity);
+
+                const details = document.createElement('p');
+                details.className = 'text-xs text-gray-400';
+                details.textContent = `${ROLE_ICONS[playerRoles[nick]]?.name || 'Duelist'} · ${RANK_ICONS[playerRanks[nick]]?.name || 'Gold'}`;
+                card.appendChild(details);
+
+                if (isAdminMode) {
+                    const actions = document.createElement('div');
+                    actions.className = 'flex gap-2 border-t border-gray-800 pt-3';
+                    const editButton = document.createElement('button');
+                    editButton.className = 'flex-1 px-2 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs text-white';
+                    editButton.innerHTML = '<i class="fa-solid fa-pen mr-1"></i>Editar';
+                    editButton.onclick = () => openProfileModal(nick);
+                    const deleteButton = document.createElement('button');
+                    deleteButton.className = 'px-2 py-1.5 rounded bg-gray-800 hover:bg-red-900 text-xs text-red-300';
+                    deleteButton.innerHTML = '<i class="fa-solid fa-trash" aria-label="Remover"></i>';
+                    deleteButton.title = 'Remover perfil';
+                    deleteButton.onclick = () => deleteProfile(nick);
+                    actions.append(editButton, deleteButton);
+                    card.appendChild(actions);
+                }
+                grid.appendChild(card);
+            });
+        }
+
+        function openProfileModal(nick = '') {
+            if (!isAdminMode) return;
+            editingProfileNick = nick || null;
+            document.getElementById('profileModalTitle').textContent = editingProfileNick ? 'EDITAR PERFIL' : 'NOVO PERFIL';
+            document.getElementById('profileNameInput').value = nick;
+            document.getElementById('profileRoleSelect').value = playerRoles[nick] || 'duelist';
+            document.getElementById('profileRankSelect').value = playerRanks[nick] || 'gold';
+            document.getElementById('profileModal').classList.remove('hidden');
+            document.getElementById('profileNameInput').focus();
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.add('hidden');
+            editingProfileNick = null;
+        }
+
+        function saveProfile() {
+            if (!isAdminMode) return;
+            const newNick = document.getElementById('profileNameInput').value.trim().toUpperCase();
+            if (!newNick) {
+                alert('Informe o nick do participante.');
+                return;
+            }
+            if (INITIAL_PLAYERS.includes(newNick) && newNick !== editingProfileNick) {
+                alert('Já existe um perfil com esse nick.');
+                return;
+            }
+
+            const role = document.getElementById('profileRoleSelect').value;
+            const rank = document.getElementById('profileRankSelect').value;
+            if (editingProfileNick) {
+                const oldNick = editingProfileNick;
+                INITIAL_PLAYERS = INITIAL_PLAYERS.map(nick => nick === oldNick ? newNick : nick);
+                availablePlayers = availablePlayers.map(nick => nick === oldNick ? newNick : nick);
+                teams.forEach(team => team.players = team.players.map(nick => nick === oldNick ? newNick : nick));
+                if (selectedPlayerNick === oldNick) selectedPlayerNick = newNick;
+                delete playerRoles[oldNick];
+                delete playerRanks[oldNick];
+            } else {
+                INITIAL_PLAYERS.push(newNick);
+                availablePlayers.push(newNick);
+                availablePlayers.sort();
+            }
+            playerRoles[newNick] = role;
+            playerRanks[newNick] = rank;
+            persistAppState();
+            closeProfileModal();
+            renderPlayersList(document.getElementById('searchInput').value);
+            renderTeams();
+            renderProfiles();
+        }
+
+        function deleteProfile(nick) {
+            if (!isAdminMode || !confirm(`Remover o perfil de ${nick}?`)) return;
+            INITIAL_PLAYERS = INITIAL_PLAYERS.filter(player => player !== nick);
+            availablePlayers = availablePlayers.filter(player => player !== nick);
+            teams.forEach(team => team.players = team.players.filter(player => player !== nick));
+            delete playerRoles[nick];
+            delete playerRanks[nick];
+            if (selectedPlayerNick === nick) selectedPlayerNick = null;
+            persistAppState();
+            renderPlayersList(document.getElementById('searchInput').value);
+            renderTeams();
+            renderProfiles();
+        }
 
         function getRoleBadge(nick) {
             const roleKey = playerRoles[nick] || 'duelist';
@@ -417,12 +860,14 @@
 
         function draftPlayerToTeam(teamIndex) {
             if (!selectedPlayerNick || !teams[teamIndex] || !availablePlayers.includes(selectedPlayerNick)) return;
+            if (draftOrder.length > 0 && draftOrder[currentTurnIndex] !== teams[teamIndex].captain) return;
 
             teams[teamIndex].players.push(selectedPlayerNick);
             availablePlayers = availablePlayers.filter(nick => nick !== selectedPlayerNick);
             selectedPlayerNick = null;
+            persistAppState();
 
-            if (draftOrder.length > 0 && draftOrder[currentTurnIndex] === teamIndex) {
+            if (draftOrder.length > 0 && draftOrder[currentTurnIndex] === teams[teamIndex].captain) {
                 proximoTurno();
             } else {
                 renderPlayersList(document.getElementById('searchInput').value);
@@ -435,30 +880,31 @@
             if (removed) {
                 availablePlayers.push(removed);
                 availablePlayers.sort();
+                persistAppState();
             }
             renderPlayersList(document.getElementById('searchInput').value);
             renderTeams();
         }
 
         function sortearOrdem() {
-            draftOrder = teams.map((_, i) => i);
-            for (let i = draftOrder.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [draftOrder[i], draftOrder[j]] = [draftOrder[j], draftOrder[i]];
+            draftOrder = teams.map(team => team.captain);
+            for (let index = draftOrder.length - 1; index > 0; index--) {
+                const randomIndex = Math.floor(Math.random() * (index + 1));
+                [draftOrder[index], draftOrder[randomIndex]] = [draftOrder[randomIndex], draftOrder[index]];
             }
             currentTurnIndex = 0;
-            updateTurnDisplay();
-            renderTeams();
+            updateTurnDisplay(true);
+            renderTeams(true);
         }
 
         function proximoTurno() {
             if (draftOrder.length === 0) return;
             currentTurnIndex = (currentTurnIndex + 1) % draftOrder.length;
-            updateTurnDisplay();
-            renderTeams();
+            updateTurnDisplay(true);
+            renderTeams(true);
         }
 
-        function updateTurnDisplay() {
+        function updateTurnDisplay(animateNames = false) {
             const turnIndicator = document.getElementById('turnIndicator');
             const turnText = document.getElementById('currentTurnTeamText');
             const counterBadge = document.getElementById('turnCounterBadge');
@@ -470,21 +916,26 @@
             nextTurnButton.title = draftOrder.length === 0 ? 'Sorteie a ordem antes de avançar' : 'Avançar para o próximo time';
 
             if (draftOrder.length > 0 && currentTurnIndex >= 0) {
-                const currentTeam = teams[draftOrder[currentTurnIndex]];
+                const currentTeam = teams.find(team => team.captain === draftOrder[currentTurnIndex]);
                 turnIndicator.classList.remove('hidden');
                 turnText.innerText = currentTeam.captain;
+                turnText.classList.remove('draw-name-in');
+                if (animateNames) {
+                    void turnText.offsetWidth;
+                    turnText.classList.add('draw-name-in');
+                }
                 counterBadge.innerText = `${currentTurnIndex + 1}/${draftOrder.length}`;
 
                 orderBanner.classList.remove('hidden');
                 orderContainer.innerHTML = '';
 
-                draftOrder.forEach((tIdx, pos) => {
+                draftOrder.forEach((captainName, pos) => {
                     const isTurn = pos === currentTurnIndex;
                     const chip = document.createElement('div');
                     chip.className = `px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 transition-all ${
                         isTurn ? 'bg-brand-pink text-white neon-border animate-pulse' : 'bg-brand-cardBg text-gray-400 border border-gray-800'
                     }`;
-                    chip.innerHTML = `<span class="opacity-60">#${pos + 1}</span> ${teams[tIdx].captain}`;
+                    chip.innerHTML = `<span class="opacity-60">#${pos + 1}</span><span class="${animateNames ? 'draw-name-in' : ''}" style="animation-delay:${pos * 55}ms">${captainName}</span>`;
                     orderContainer.appendChild(chip);
                 });
             } else {
@@ -500,6 +951,7 @@
             draftOrder = [];
             currentTurnIndex = -1;
             document.getElementById('searchInput').value = '';
+            persistAppState();
             updateTurnDisplay();
             renderPlayersList();
             renderTeams();
@@ -527,10 +979,14 @@
         function setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
                 const modalOpen = !document.getElementById('configModal').classList.contains('hidden') ||
-                    !document.getElementById('iconPickerModal').classList.contains('hidden');
+                    !document.getElementById('iconPickerModal').classList.contains('hidden') ||
+                    !document.getElementById('profileModal').classList.contains('hidden') ||
+                    !document.getElementById('adminLoginModal').classList.contains('hidden');
                 if (e.code === 'Escape') {
                     closeConfigModal();
                     closeIconModal();
+                    closeProfileModal();
+                    closeAdminLoginModal();
                 }
                 if (e.code === 'Space' && !modalOpen && !['INPUT', 'TEXTAREA', 'BUTTON'].includes(e.target.tagName)) {
                     e.preventDefault();
@@ -576,10 +1032,10 @@
                             ${getRankBadge(nick)}
                             <span class="truncate text-[11px]">${nick}</span>
                         </div>
-                        <button onclick="openIconModal(event, '${nick}')" title="Alterar Role / Rank"
+                        ${isAdminMode ? `<button onclick="openIconModal(event, '${nick}')" title="Alterar Role / Rank"
                             class="opacity-40 group-hover:opacity-100 hover:text-brand-pink p-0.5 transition-all">
                             <i class="fa-solid fa-gear text-[10px]"></i>
-                        </button>
+                        </button>` : ''}
                     `;
 
                     card.addEventListener('click', (e) => {
@@ -603,23 +1059,33 @@
         }
 
         // RENDERIZAÇÃO DOS CARDS DOS TIMES
-        function renderTeams() {
+        function renderTeams(animateActivePick = false) {
             const grid = document.getElementById('teamsGrid');
             grid.innerHTML = '';
 
-            teams.forEach((team, teamIndex) => {
-                const isCurrentTurn = (draftOrder.length > 0 && draftOrder[currentTurnIndex] === teamIndex);
+            const teamEntries = draftOrder.length > 0
+                ? draftOrder.map(captain => {
+                    const teamIndex = teams.findIndex(team => team.captain === captain);
+                    return { team: teams[teamIndex], teamIndex };
+                }).filter(entry => entry.team)
+                : teams.map((team, teamIndex) => ({ team, teamIndex }));
+
+            teamEntries.forEach(({ team, teamIndex }, displayIndex) => {
+                const isCurrentTurn = (draftOrder.length > 0 && draftOrder[currentTurnIndex] === team.captain);
+                const pickPosition = draftOrder.indexOf(team.captain);
+                const animateCard = animateActivePick && pickPosition >= 0;
 
                 const teamCard = document.createElement('div');
+                teamCard.style.setProperty('--pick-order-delay', `${Math.max(0, pickPosition) * 55}ms`);
                 teamCard.className = `bg-brand-panelBg border-2 rounded-lg flex flex-col overflow-hidden transition-all duration-300 ${
-                    isCurrentTurn ? 'border-brand-pink active-turn' : 'border-gray-800/90 hover:border-gray-700'
+                    isCurrentTurn ? `border-brand-pink active-turn ${animateCard ? 'pick-card-in' : ''}` : `border-gray-800/90 hover:border-gray-700 ${animateCard ? 'pick-card-in' : ''}`
                 }`;
 
                 const headerHtml = `
                     <div class="bg-brand-cardBg px-3 py-2 border-b border-gray-800 flex justify-between items-center">
                         <div class="flex items-center gap-2 overflow-hidden">
                             <div class="w-6 h-6 rounded-full ${isCurrentTurn ? 'bg-brand-pink text-white font-black scale-110 neon-border-active' : 'bg-brand-pink/20 border border-brand-pink text-brand-pink font-bold'} flex items-center justify-center text-xs transition-all">
-                                ${draftOrder.length > 0 ? (draftOrder.indexOf(teamIndex) + 1) : (teamIndex + 1)}
+                                ${draftOrder.length > 0 ? displayIndex + 1 : team.id}
                             </div>
                             <h3 class="font-gamer text-xs sm:text-sm font-bold text-white truncate">${team.name}</h3>
                         </div>
@@ -646,9 +1112,9 @@
                                 ${playerNick}
                             </span>
                             <div class="flex items-center gap-1">
-                                <button onclick="openIconModal(event, '${playerNick}')" title="Alterar Role / Rank" class="opacity-40 group-hover:opacity-100 text-gray-400 hover:text-brand-pink p-0.5">
+                                ${isAdminMode ? `<button onclick="openIconModal(event, '${playerNick}')" title="Alterar Role / Rank" class="opacity-40 group-hover:opacity-100 text-gray-400 hover:text-brand-pink p-0.5">
                                     <i class="fa-solid fa-gear text-[10px]"></i>
-                                </button>
+                                </button>` : ''}
                                 <button onclick="removerDoTime(${teamIndex}, ${pIndex})" class="text-gray-500 hover:text-red-400 p-0.5 text-xs" title="Remover de volta para lista">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
@@ -678,6 +1144,7 @@
 
         // MODAL DE SELEÇÃO DE ROLE & RANK
         function openIconModal(event, nick) {
+            if (!isAdminMode) return;
             if (event) event.stopPropagation();
             iconTargetNick = nick;
             
@@ -743,12 +1210,15 @@
         function closeIconModal() {
             document.getElementById('iconPickerModal').classList.add('hidden');
             iconTargetNick = null;
+            persistAppState();
             renderPlayersList(document.getElementById('searchInput').value);
             renderTeams();
+            renderProfiles();
         }
 
         // CONFIGURAÇÕES DO CAMPEONATO (CORES, TITULO, CAPITAS E JOGADORAS)
         function openConfigModal() {
+            if (!isAdminMode) return;
             document.getElementById('configTournamentTitle').value = tournamentTitle;
             document.getElementById('configCaptainsText').value = teams.map(t => t.captain).join('\n');
             document.getElementById('configPlayersText').value = INITIAL_PLAYERS.join('\n');
@@ -764,6 +1234,7 @@
         }
 
         function saveConfigModal() {
+            if (!isAdminMode) return;
             const newCaptains = [...new Set(document.getElementById('configCaptainsText').value
                 .split('\n').map(captain => captain.trim().toUpperCase()).filter(Boolean))];
             if (newCaptains.length === 0) {
@@ -798,16 +1269,7 @@
                 CardBg: document.getElementById('colorCardBg').value,
                 PanelBg: document.getElementById('colorPanelBg').value
             };
-            Object.entries(themeColors).forEach(([key, value]) => {
-                const [red, green, blue] = value.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16));
-                const variable = {
-                    Pink: '--color-pink-rgb',
-                    DarkBg: '--color-dark-bg-rgb',
-                    CardBg: '--color-card-bg-rgb',
-                    PanelBg: '--color-panel-bg-rgb'
-                }[key];
-                document.documentElement.style.setProperty(variable, `${red} ${green} ${blue}`);
-            });
+            applyThemeColors();
 
             const roleKeys = Object.keys(ROLE_ICONS);
             const rankKeys = Object.keys(RANK_ICONS);
@@ -822,9 +1284,11 @@
             }
 
             closeConfigModal();
+            persistAppState();
             updateTurnDisplay();
             renderPlayersList();
             renderTeams();
+            renderProfiles();
         }
 
         function setupColorInputs() {
