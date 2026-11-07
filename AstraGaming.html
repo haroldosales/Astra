@@ -440,7 +440,7 @@
             "FERNANDA_TSTREAM", "IXTELAA", "STAYMISS", "LEAHHZITA"
         ];
 
-        let INITIAL_PLAYERS = [
+        const DEFAULT_PLAYERS = [
             "AMANDIOCA", "AMETISTALY", "ANATVI", "ANAJ", "ANATHEGAM...", "AULITA", 
             "AYUMIAR", "BATISTELAZI", "BELOVED", "BIAATIRADORA", "BLOODS2", "BONEMOON", 
             "BOTAN_TOXICA", "BYSRTN", "CAHNEPO", "CARAMELINHO", "CATRINA_BOSS", "DARII", 
@@ -455,6 +455,8 @@
             "NOBREZA", "NOT_THEART...", "PADAWAN_C...", "QCERBERUS", "R_JENNY", "RAIROTACARIN", 
             "RUEDO_BRAN...", "SISBELOVA", "STORYCHARA", "SZANMAS7", "TENEBRAMH"
         ];
+        const ROSTER_RESTORE_VERSION = 1;
+        let INITIAL_PLAYERS = [...DEFAULT_PLAYERS];
 
         let playerRoles = {};
         let playerRanks = {};
@@ -508,6 +510,12 @@
                 const saved = JSON.parse(localStorage.getItem('astraDraftState') || 'null');
                 if (!saved) return;
 
+                if (saved.rosterRestoreVersion !== ROSTER_RESTORE_VERSION) {
+                    saved.players = [...DEFAULT_PLAYERS];
+                    saved.rosterRestoreVersion = ROSTER_RESTORE_VERSION;
+                    localStorage.setItem('astraDraftState', JSON.stringify(saved));
+                }
+
                 if (Array.isArray(saved.captains) && saved.captains.length) INITIAL_CAPTAINS = saved.captains;
                 if (Array.isArray(saved.players)) INITIAL_PLAYERS = [...new Set(saved.players)];
                 if (saved.roles && typeof saved.roles === 'object') playerRoles = saved.roles;
@@ -536,6 +544,7 @@
                 teams,
                 roles: playerRoles,
                 ranks: playerRanks,
+                rosterRestoreVersion: ROSTER_RESTORE_VERSION,
                 title: tournamentTitle,
                 colors: themeColors
             };
@@ -571,6 +580,11 @@
                     return;
                 }
 
+                const rosterWasRestored = state.rosterRestoreVersion !== ROSTER_RESTORE_VERSION;
+                if (rosterWasRestored) {
+                    state.players = [...DEFAULT_PLAYERS];
+                    state.rosterRestoreVersion = ROSTER_RESTORE_VERSION;
+                }
                 localStorage.setItem('astraDraftState', JSON.stringify(state));
                 restoreSavedState();
                 applyThemeColors();
@@ -578,6 +592,7 @@
                 renderPlayersList();
                 renderTeams();
                 renderProfiles();
+                if (isAdminMode && rosterWasRestored) persistAppState();
             } catch (error) {
                 console.error('Falha ao carregar os dados compartilhados do Vercel.', error);
                 if (location.protocol !== 'file:') {
