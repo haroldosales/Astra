@@ -222,6 +222,26 @@
                     <i class="fa-solid fa-user-plus mr-1"></i> NOVO PERFIL
                 </button>
             </div>
+            <section id="adminPasswordPanel" class="hidden bg-brand-cardBg border border-gray-800 rounded-lg p-4 mb-5">
+                <h3 class="font-gamer text-sm font-bold text-white mb-1"><i class="fa-solid fa-key text-brand-pink mr-1"></i> SEGURANÇA DA CONTA ADMIN</h3>
+                <p class="text-xs text-gray-400 mb-4">Gerencie os perfis abaixo e altere a senha da conta administrativa.</p>
+                <form onsubmit="changeAdminPassword(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                    <div>
+                        <label for="currentAdminPassword" class="block text-xs font-bold text-gray-300 mb-1">SENHA ATUAL</label>
+                        <input id="currentAdminPassword" type="password" autocomplete="current-password" required class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink">
+                    </div>
+                    <div>
+                        <label for="newAdminPassword" class="block text-xs font-bold text-gray-300 mb-1">NOVA SENHA</label>
+                        <input id="newAdminPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink">
+                    </div>
+                    <div>
+                        <label for="confirmAdminPassword" class="block text-xs font-bold text-gray-300 mb-1">CONFIRMAR SENHA</label>
+                        <input id="confirmAdminPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required class="w-full bg-brand-darkBg border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-pink">
+                    </div>
+                    <button id="btnChangeAdminPassword" type="submit" class="bg-brand-pink hover:bg-brand-pinkDark text-white font-bold px-3 py-2 rounded text-xs">ALTERAR SENHA</button>
+                </form>
+                <p id="adminPasswordStatus" role="status" aria-live="polite" class="text-xs text-gray-400 mt-3 min-h-4"></p>
+            </section>
             <div class="relative max-w-sm mb-4">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-xs"></i>
                 <input type="search" id="profileSearchInput" oninput="renderProfiles()" placeholder="Buscar participante..." class="w-full bg-brand-cardBg text-xs text-gray-200 pl-8 pr-3 py-2 rounded border border-gray-800 focus:outline-none focus:border-brand-pink">
@@ -615,6 +635,48 @@
             }
         }
 
+        async function changeAdminPassword(event) {
+            event.preventDefault();
+            if (!isAdminMode) return;
+
+            const status = document.getElementById('adminPasswordStatus');
+            const submitButton = document.getElementById('btnChangeAdminPassword');
+            const currentPassword = document.getElementById('currentAdminPassword').value;
+            const newPassword = document.getElementById('newAdminPassword').value;
+            const confirmPassword = document.getElementById('confirmAdminPassword').value;
+
+            if (newPassword !== confirmPassword) {
+                status.textContent = 'A nova senha e a confirmação não são iguais.';
+                return;
+            }
+
+            submitButton.disabled = true;
+            status.textContent = 'Atualizando senha...';
+            try {
+                const response = await fetch('/api/admin-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    status.textContent = result.error || 'Não foi possível alterar a senha.';
+                    return;
+                }
+
+                document.getElementById('currentAdminPassword').value = '';
+                document.getElementById('newAdminPassword').value = '';
+                document.getElementById('confirmAdminPassword').value = '';
+                status.textContent = 'Senha alterada com sucesso.';
+            } catch (error) {
+                console.error('Falha ao alterar a senha Admin.', error);
+                status.textContent = 'Não foi possível conectar à Vercel.';
+            } finally {
+                submitButton.disabled = false;
+            }
+        }
+
         async function logoutAdmin() {
             try {
                 await fetch('/api/admin-login', { method: 'DELETE', credentials: 'same-origin' });
@@ -637,6 +699,7 @@
             document.getElementById('btnAdminLogout').classList.toggle('hidden', !canEdit);
             document.getElementById('btnConfig').disabled = !canEdit;
             document.getElementById('btnAddProfile').classList.toggle('hidden', !canEdit);
+            document.getElementById('adminPasswordPanel').classList.toggle('hidden', !canEdit);
             document.getElementById('profileViewNotice').textContent = canEdit
                 ? 'Admin autenticado. Alterações são compartilhadas com todos.'
                 : 'Visualização dos perfis cadastrados.';
