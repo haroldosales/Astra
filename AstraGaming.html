@@ -131,6 +131,9 @@
             <button id="viewProfilesButton" onclick="switchView('profiles')" class="px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800">
                 <i class="fa-solid fa-id-card mr-1"></i> PERFIS
             </button>
+            <button id="viewCategoriesButton" onclick="switchView('categories')" class="hidden px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800">
+                <i class="fa-solid fa-layer-group mr-1"></i> CATEGORIAS
+            </button>
             <button id="btnAdminMode" onclick="toggleAdminMode()" class="px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800 border-l border-gray-700" aria-pressed="false" title="Ativar modo de edição local">
                 <i class="fa-solid fa-user-shield mr-1"></i> ADMIN
             </button>
@@ -248,6 +251,44 @@
             </div>
             <div id="profilesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"></div>
             <p id="emptyProfilesNotice" class="hidden py-10 text-center text-sm text-gray-500">Nenhum perfil encontrado.</p>
+        </section>
+    </main>
+
+    <main id="categoriesView" class="hidden flex-1 p-3 sm:p-5 max-w-[1440px] mx-auto w-full">
+        <section class="w-full">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-4 mb-4">
+                <div>
+                    <p class="text-[10px] tracking-[0.2em] text-brand-pink font-bold mb-1">CONFIGURAÇÃO DO TORNEIO</p>
+                    <h2 class="font-gamer text-lg font-bold text-white">GERENCIAR CATEGORIAS</h2>
+                    <p class="text-xs text-gray-400 mt-1">Organize as funções que estruturam as equipes do Astra Gaming.</p>
+                </div>
+                <button id="btnAddCategory" onclick="addCategory()" class="hidden bg-brand-pink hover:bg-brand-pinkDark text-white font-bold px-3 py-2 rounded text-xs">
+                    <i class="fa-solid fa-plus mr-1"></i> NOVA CATEGORIA
+                </button>
+            </div>
+            <p id="categoryViewNotice" class="text-xs text-gray-400 mb-4" role="status" aria-live="polite"></p>
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+                <div class="bg-brand-cardBg border border-gray-800 rounded-lg p-3"><span class="block text-[10px] text-gray-500 tracking-wider">CATEGORIAS</span><strong id="categoryCount" class="block text-xl font-gamer text-white mt-1">00</strong></div>
+                <div class="bg-brand-cardBg border border-gray-800 rounded-lg p-3"><span class="block text-[10px] text-gray-500 tracking-wider">ATIVAS</span><strong id="activeCategoryCount" class="block text-xl font-gamer text-brand-pink mt-1">00</strong></div>
+                <div class="col-span-2 lg:col-span-1 bg-brand-cardBg border border-gray-800 rounded-lg p-3"><span class="block text-[10px] text-gray-500 tracking-wider">FUNÇÕES DE MARVEL RIVALS</span><p class="text-xs text-gray-300 mt-2">Duelista · Estrategista · Vanguarda</p></div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 bg-brand-cardBg border border-gray-800 rounded-lg overflow-hidden">
+                <div class="p-4 border-b lg:border-b-0 lg:border-r border-gray-800">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        <div><h3 class="font-bold text-sm text-white">Suas categorias</h3><span id="categoryListCount" class="text-[10px] text-gray-500"></span></div>
+                        <label class="relative w-full sm:w-56">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-xs"></i>
+                            <input id="categorySearchInput" type="search" oninput="renderCategories()" placeholder="Buscar categoria" aria-label="Buscar categoria" class="w-full bg-brand-darkBg text-xs text-gray-200 pl-8 pr-3 py-2 rounded border border-gray-800 focus:outline-none focus:border-brand-pink">
+                        </label>
+                    </div>
+                    <div id="categoryList" class="min-h-48 divide-y divide-gray-800"></div>
+                    <p id="emptyCategoriesNotice" class="hidden py-8 text-center text-xs text-gray-500">Nenhuma categoria encontrada.</p>
+                    <button id="btnAddCategoryRow" onclick="addCategory()" class="hidden mt-3 w-full rounded border border-dashed border-gray-700 p-2 text-xs text-gray-300 hover:border-brand-pink hover:text-white">
+                        <i class="fa-solid fa-plus mr-1"></i> Adicionar categoria
+                    </button>
+                </div>
+                <div id="categoryEditor" class="p-4 min-h-72"></div>
+            </div>
         </section>
     </main>
 
@@ -421,6 +462,32 @@
             }
         };
 
+        const CATEGORY_ROLES = {
+            duelist: {
+                name: 'Duelista',
+                mark: 'DU',
+                iconUrl: 'https://rivalskins.com/wp-content/uploads/marvel-assets/assets/role-icons/Duelist.png',
+                description: 'Dano e pressão na linha de frente.'
+            },
+            strategist: {
+                name: 'Estrategista',
+                mark: 'ES',
+                iconUrl: 'https://rivalskins.com/wp-content/uploads/marvel-assets/assets/role-icons/Strategist.png',
+                description: 'Suporte tático e sustentação da equipe.'
+            },
+            vanguard: {
+                name: 'Vanguarda',
+                mark: 'VA',
+                iconUrl: 'https://rivalskins.com/wp-content/uploads/marvel-assets/assets/role-icons/Vanguard.png',
+                description: 'Resistência e controle de espaço.'
+            }
+        };
+        const DEFAULT_CATEGORIES = [
+            { id: 'duelistas', name: 'Duelistas', role: 'duelist', iconUrl: CATEGORY_ROLES.duelist.iconUrl, description: CATEGORY_ROLES.duelist.description, active: true },
+            { id: 'estrategistas', name: 'Estrategistas', role: 'strategist', iconUrl: CATEGORY_ROLES.strategist.iconUrl, description: CATEGORY_ROLES.strategist.description, active: true },
+            { id: 'vanguardas', name: 'Vanguardas', role: 'vanguard', iconUrl: CATEGORY_ROLES.vanguard.iconUrl, description: CATEGORY_ROLES.vanguard.description, active: true }
+        ];
+
         // Ranks Oficiais Marvel Rivals (inspirados em rivalskins.com/assets/rank-logos/)
         const RANK_ICONS = {
             bronze: { name: "Bronze", color: "#cd7f32", border: "#8c531b", icon: "fa-shield-cat" },
@@ -460,6 +527,8 @@
 
         let playerRoles = {};
         let playerRanks = {};
+        let categories = DEFAULT_CATEGORIES.map(category => ({ ...category }));
+        let selectedCategoryId = categories[0].id;
 
         let availablePlayers = [...INITIAL_PLAYERS];
         let teams = INITIAL_CAPTAINS.map((cap, index) => ({
@@ -500,14 +569,74 @@
             renderPlayersList();
             renderTeams();
             renderProfiles();
+            renderCategories();
             setupKeyboardShortcuts();
             setupColorInputs();
             await loadSharedState();
         });
 
+        function normalizeCategories(value) {
+            if (!Array.isArray(value) || !value.every(category => category
+                && typeof category.id === 'string'
+                && typeof category.name === 'string'
+                && Object.hasOwn(CATEGORY_ROLES, category.role)
+                && typeof category.description === 'string'
+                && typeof category.active === 'boolean')) return null;
+
+            return value.map(category => ({
+                id: category.id,
+                name: category.name,
+                role: category.role,
+                iconUrl: isAllowedCategoryIconUrl(category.iconUrl)
+                    ? category.iconUrl
+                    : CATEGORY_ROLES[category.role].iconUrl,
+                description: category.description,
+                active: category.active
+            }));
+        }
+
+        function isAllowedCategoryIconUrl(value) {
+            if (typeof value !== 'string') return false;
+            try {
+                const url = new URL(value);
+                return url.protocol === 'https:'
+                    && url.hostname === 'rivalskins.com'
+                    && url.pathname.includes('/role-icons/');
+            } catch {
+                return false;
+            }
+        }
+
+        function readSavedCategories(stateCategories) {
+            const fromState = normalizeCategories(stateCategories);
+            if (fromState) return fromState;
+            if (stateCategories !== undefined) console.warn('As categorias compartilhadas têm um formato inválido; tentando os dados locais.');
+
+            try {
+                const legacy = JSON.parse(localStorage.getItem('astra-gaming-categories') || 'null');
+                const fromLegacy = normalizeCategories(legacy);
+                if (fromLegacy) return fromLegacy;
+                if (legacy !== null) console.warn('As categorias locais salvas têm um formato inválido; usando os valores iniciais.');
+            } catch (error) {
+                console.warn('Não foi possível carregar as categorias locais.', error);
+            }
+            return DEFAULT_CATEGORIES.map(category => ({ ...category }));
+        }
+
+        function escapeCategoryHtml(value) {
+            return String(value).replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[character]);
+        }
+
         function restoreSavedState() {
             try {
                 const saved = JSON.parse(localStorage.getItem('astraDraftState') || 'null');
+                categories = readSavedCategories(saved?.categories);
                 if (!saved) return;
 
                 if (saved.rosterRestoreVersion !== ROSTER_RESTORE_VERSION) {
@@ -544,14 +673,17 @@
                 teams,
                 roles: playerRoles,
                 ranks: playerRanks,
+                categories,
                 rosterRestoreVersion: ROSTER_RESTORE_VERSION,
                 title: tournamentTitle,
                 colors: themeColors
             };
             try {
                 localStorage.setItem('astraDraftState', JSON.stringify(state));
+                localStorage.setItem('astra-gaming-categories', JSON.stringify(categories));
             } catch (error) {
                 console.warn('Não foi possível salvar os dados neste navegador.', error);
+                document.getElementById('categoryViewNotice').textContent = 'Não foi possível salvar as categorias neste navegador.';
             }
 
             if (isAdminMode) {
@@ -566,6 +698,7 @@
                 }).catch(error => {
                     console.error('Falha ao salvar os dados compartilhados.', error);
                     document.getElementById('profileViewNotice').textContent = 'Não foi possível salvar no Vercel. Verifique a configuração de armazenamento.';
+                    document.getElementById('categoryViewNotice').textContent = 'As categorias foram salvas neste navegador, mas não foi possível sincronizar com a Vercel.';
                 });
             }
         }
@@ -592,6 +725,7 @@
                 renderPlayersList();
                 renderTeams();
                 renderProfiles();
+                renderCategories();
                 if (isAdminMode && rosterWasRestored) persistAppState();
             } catch (error) {
                 console.error('Falha ao carregar os dados compartilhados do Vercel.', error);
@@ -714,6 +848,9 @@
             document.getElementById('btnAdminLogout').classList.toggle('hidden', !canEdit);
             document.getElementById('btnConfig').disabled = !canEdit;
             document.getElementById('btnAddProfile').classList.toggle('hidden', !canEdit);
+            document.getElementById('viewCategoriesButton').classList.toggle('hidden', !canEdit);
+            document.getElementById('btnAddCategory').classList.toggle('hidden', !canEdit);
+            document.getElementById('btnAddCategoryRow').classList.toggle('hidden', !canEdit);
             document.getElementById('adminPasswordPanel').classList.toggle('hidden', !canEdit);
             document.getElementById('profileViewNotice').textContent = canEdit
                 ? 'Admin autenticado. Alterações são compartilhadas com todos.'
@@ -721,6 +858,8 @@
             renderProfiles();
             renderPlayersList(document.getElementById('searchInput').value);
             renderTeams();
+            renderCategories();
+            if (!canEdit && currentView === 'categories') switchView('draft');
         }
 
         function applyThemeColors() {
@@ -753,20 +892,210 @@
         }
 
         function switchView(view) {
-            currentView = view === 'profiles' ? 'profiles' : 'draft';
+            if (view === 'categories' && !isAdminMode) {
+                openAdminLoginModal();
+                return;
+            }
+            currentView = ['profiles', 'categories'].includes(view) ? view : 'draft';
             document.getElementById('draftView').classList.toggle('hidden', currentView !== 'draft');
             document.getElementById('profilesView').classList.toggle('hidden', currentView !== 'profiles');
+            document.getElementById('categoriesView').classList.toggle('hidden', currentView !== 'categories');
             document.getElementById('draftHeaderControls').classList.toggle('hidden', currentView !== 'draft');
-            document.getElementById('viewDraftButton').className = currentView === 'draft'
-                ? 'px-3 py-1.5 rounded text-xs font-bold bg-brand-pink text-white'
-                : 'px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800';
-            document.getElementById('viewProfilesButton').className = currentView === 'profiles'
-                ? 'px-3 py-1.5 rounded text-xs font-bold bg-brand-pink text-white'
-                : 'px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800';
-            document.getElementById('viewDraftButton').toggleAttribute('aria-current', currentView === 'draft');
-            document.getElementById('viewProfilesButton').toggleAttribute('aria-current', currentView === 'profiles');
+            [['draft', 'viewDraftButton'], ['profiles', 'viewProfilesButton'], ['categories', 'viewCategoriesButton']].forEach(([viewName, buttonId]) => {
+                const button = document.getElementById(buttonId);
+                button.className = currentView === viewName
+                    ? 'px-3 py-1.5 rounded text-xs font-bold bg-brand-pink text-white'
+                    : 'px-3 py-1.5 rounded text-xs font-bold text-gray-300 hover:bg-gray-800';
+                button.toggleAttribute('aria-current', currentView === viewName);
+            });
             document.getElementById('orderBanner').classList.toggle('hidden', currentView !== 'draft' || draftOrder.length === 0);
             renderProfiles();
+            renderCategories();
+        }
+
+        function selectCategory(categoryId) {
+            selectedCategoryId = categoryId;
+            renderCategories();
+        }
+
+        function addCategory() {
+            if (!isAdminMode) return;
+            const role = 'duelist';
+            const category = {
+                id: crypto.randomUUID(),
+                name: `Nova categoria ${categories.length + 1}`,
+                role,
+                iconUrl: CATEGORY_ROLES[role].iconUrl,
+                description: CATEGORY_ROLES[role].description,
+                active: true
+            };
+            categories.push(category);
+            selectedCategoryId = category.id;
+            persistAppState();
+            renderCategories();
+        }
+
+        function saveCategory(event) {
+            event.preventDefault();
+            if (!isAdminMode) return;
+            const selected = categories.find(category => category.id === selectedCategoryId);
+            if (!selected) return;
+
+            const form = event.currentTarget;
+            const name = form.elements.categoryName.value.trim();
+            const role = form.elements.categoryRole.value;
+            const iconUrl = form.elements.categoryIconUrl.value.trim();
+            const description = form.elements.categoryDescription.value.trim();
+            if (!name) {
+                alert('Informe o nome da categoria.');
+                return;
+            }
+            if (!Object.hasOwn(CATEGORY_ROLES, role)) {
+                alert('Selecione uma função válida.');
+                return;
+            }
+            if (!isAllowedCategoryIconUrl(iconUrl)) {
+                alert('Use uma URL HTTPS de imagem da pasta role-icons do RivalSkins.');
+                return;
+            }
+
+            Object.assign(selected, { name, role, iconUrl, description });
+            persistAppState();
+            renderCategories();
+            document.getElementById('categoryViewNotice').textContent = 'Categoria salva neste navegador.';
+        }
+
+        function toggleCategory(categoryId) {
+            if (!isAdminMode) return;
+            const category = categories.find(item => item.id === categoryId);
+            if (!category) return;
+            category.active = !category.active;
+            persistAppState();
+            renderCategories();
+        }
+
+        function deleteCategory(categoryId) {
+            if (!isAdminMode) return;
+            const category = categories.find(item => item.id === categoryId);
+            if (!category || !confirm(`Excluir a categoria “${category.name}”?`)) return;
+            categories = categories.filter(item => item.id !== categoryId);
+            selectedCategoryId = categories[0]?.id || '';
+            persistAppState();
+            renderCategories();
+        }
+
+        function renderCategories() {
+            const list = document.getElementById('categoryList');
+            if (!list) return;
+            const editor = document.getElementById('categoryEditor');
+            if (!isAdminMode) {
+                list.replaceChildren();
+                editor.replaceChildren();
+                document.getElementById('categoryCount').textContent = '00';
+                document.getElementById('activeCategoryCount').textContent = '00';
+                document.getElementById('categoryListCount').textContent = '';
+                document.getElementById('emptyCategoriesNotice').classList.add('hidden');
+                return;
+            }
+            const search = document.getElementById('categorySearchInput').value.trim().toLowerCase();
+            const filtered = categories.filter(category => category.name.toLowerCase().includes(search));
+            const activeCount = categories.filter(category => category.active).length;
+            document.getElementById('categoryCount').textContent = String(categories.length).padStart(2, '0');
+            document.getElementById('activeCategoryCount').textContent = String(activeCount).padStart(2, '0');
+            document.getElementById('categoryListCount').textContent = `${filtered.length} de ${categories.length} itens`;
+            document.getElementById('emptyCategoriesNotice').classList.toggle('hidden', filtered.length > 0);
+            list.replaceChildren();
+
+            filtered.forEach(category => {
+                const role = CATEGORY_ROLES[category.role];
+                const row = document.createElement('div');
+                row.className = `flex items-center gap-2 py-2 px-2 rounded ${selectedCategoryId === category.id ? 'bg-purple-950/40 border-l-2 border-brand-pink' : 'border-l-2 border-transparent'}`;
+
+                const select = document.createElement('button');
+                select.type = 'button';
+                select.className = 'min-w-0 flex-1 flex items-center gap-3 text-left';
+                select.setAttribute('aria-pressed', String(selectedCategoryId === category.id));
+                const icon = document.createElement('span');
+                icon.className = 'relative w-10 h-10 flex-shrink-0 flex items-center justify-center overflow-hidden rounded border border-gray-700 bg-gray-900 text-brand-pink text-xs font-bold';
+                icon.setAttribute('aria-hidden', 'true');
+                icon.textContent = role.mark;
+                const image = document.createElement('img');
+                image.src = category.iconUrl;
+                image.alt = '';
+                image.className = 'absolute inset-0 w-full h-full object-contain';
+                image.onerror = () => image.remove();
+                icon.appendChild(image);
+                const copy = document.createElement('span');
+                copy.className = 'min-w-0 grid gap-1';
+                const name = document.createElement('strong');
+                name.className = 'truncate text-xs text-white';
+                name.textContent = category.name;
+                const roleName = document.createElement('small');
+                roleName.className = 'text-[10px] text-gray-400';
+                roleName.textContent = role.name;
+                copy.append(name, roleName);
+                select.append(icon, copy);
+                select.addEventListener('click', () => selectCategory(category.id));
+                row.appendChild(select);
+
+                const activeSwitch = document.createElement('button');
+                activeSwitch.type = 'button';
+                activeSwitch.role = 'switch';
+                activeSwitch.setAttribute('aria-checked', String(category.active));
+                activeSwitch.setAttribute('aria-label', `${category.active ? 'Desativar' : 'Ativar'} ${category.name}`);
+                activeSwitch.disabled = !isAdminMode;
+                activeSwitch.className = `w-9 h-5 rounded-full p-0.5 flex items-center ${category.active ? 'justify-end bg-brand-pink' : 'justify-start bg-gray-700'} disabled:opacity-50`;
+                const knob = document.createElement('span');
+                knob.className = 'w-4 h-4 rounded-full bg-white';
+                activeSwitch.appendChild(knob);
+                activeSwitch.addEventListener('click', () => toggleCategory(category.id));
+                row.appendChild(activeSwitch);
+                list.appendChild(row);
+            });
+
+            const selected = categories.find(category => category.id === selectedCategoryId);
+            const addButton = '<button type="button" class="mt-4 rounded bg-brand-pink px-3 py-2 text-xs font-bold text-white" id="categoryEmptyAdd"><i class="fa-solid fa-plus mr-1"></i> Nova categoria</button>';
+            if (!selected) {
+                editor.innerHTML = `<div class="h-full min-h-64 flex flex-col items-center justify-center text-center"><span class="text-3xl text-brand-pink"><i class="fa-solid fa-layer-group"></i></span><h3 class="font-gamer font-bold text-white mt-3">Nenhuma categoria selecionada</h3><p class="text-xs text-gray-400 mt-2">Selecione uma categoria ou crie uma nova para começar.</p>${isAdminMode ? addButton : ''}</div>`;
+                document.getElementById('categoryEmptyAdd')?.addEventListener('click', addCategory);
+                return;
+            }
+
+            const role = CATEGORY_ROLES[selected.role];
+            const editingDisabled = isAdminMode ? '' : 'disabled';
+            editor.innerHTML = `
+                <form id="categoryEditForm" class="space-y-3">
+                    <div class="flex items-start justify-between gap-3 border-b border-gray-800 pb-3">
+                        <div><p class="text-[10px] tracking-wider text-gray-500">DETALHES DA CATEGORIA</p><h3 class="font-gamer text-sm font-bold text-white mt-1">Editar categoria</h3></div>
+                        <button id="categoryDeleteButton" type="button" title="Excluir categoria" aria-label="Excluir categoria" ${editingDisabled} class="rounded border border-red-900 px-2 py-1 text-[10px] font-bold text-red-300 hover:bg-red-950 disabled:opacity-50"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <div class="flex items-center gap-3 rounded bg-brand-darkBg p-3">
+                        <span class="relative w-12 h-12 flex-shrink-0 flex items-center justify-center overflow-hidden rounded border border-gray-700 bg-gray-900 text-brand-pink font-bold">${role.mark}<img id="categoryPreviewIcon" src="${escapeCategoryHtml(selected.iconUrl)}" alt="" class="absolute inset-0 w-full h-full object-contain"></span>
+                        <span><small class="block text-[9px] tracking-wider text-gray-500">ÍCONE DE FUNÇÃO</small><strong id="categoryPreviewRole" class="block text-xs text-white mt-1">${role.name}</strong><small class="block text-[10px] text-gray-400 mt-1">${role.description}</small></span>
+                    </div>
+                    <label class="block text-[10px] font-bold text-gray-300" for="categoryName">Nome da categoria</label>
+                    <input id="categoryName" name="categoryName" maxlength="40" required value="${escapeCategoryHtml(selected.name)}" ${editingDisabled} class="w-full -mt-2 rounded border border-gray-700 bg-brand-darkBg px-3 py-2 text-xs text-white outline-none focus:border-brand-pink disabled:opacity-60">
+                    <label class="block text-[10px] font-bold text-gray-300" for="categoryRole">Função vinculada</label>
+                    <select id="categoryRole" name="categoryRole" ${editingDisabled} class="w-full -mt-2 rounded border border-gray-700 bg-brand-darkBg px-3 py-2 text-xs text-white outline-none focus:border-brand-pink disabled:opacity-60">
+                        ${Object.entries(CATEGORY_ROLES).map(([key, item]) => `<option value="${key}" ${selected.role === key ? 'selected' : ''}>${item.name}</option>`).join('')}
+                    </select>
+                    <label class="block text-[10px] font-bold text-gray-300" for="categoryIconUrl">URL do ícone</label>
+                    <input id="categoryIconUrl" name="categoryIconUrl" type="url" required value="${escapeCategoryHtml(selected.iconUrl)}" placeholder="https://rivalskins.com/.../role-icons/..." ${editingDisabled} class="w-full -mt-2 rounded border border-gray-700 bg-brand-darkBg px-3 py-2 text-xs text-white outline-none focus:border-brand-pink disabled:opacity-60">
+                    <p class="-mt-2 text-[10px] text-gray-500">Use imagens HTTPS da pasta <code>role-icons</code> do <a href="https://rivalskins.com/assets/role-icons/" target="_blank" rel="noreferrer" class="text-brand-pink underline">RivalSkins</a>.</p>
+                    <label class="block text-[10px] font-bold text-gray-300" for="categoryDescription">Descrição</label>
+                    <textarea id="categoryDescription" name="categoryDescription" maxlength="120" rows="3" ${editingDisabled} class="w-full -mt-2 rounded border border-gray-700 bg-brand-darkBg px-3 py-2 text-xs text-white outline-none focus:border-brand-pink disabled:opacity-60">${escapeCategoryHtml(selected.description)}</textarea>
+                    <div class="flex justify-end border-t border-gray-800 pt-3">
+                        ${isAdminMode ? '<button type="submit" class="rounded bg-brand-pink px-4 py-2 text-xs font-bold text-white hover:bg-brand-pinkDark"><i class="fa-solid fa-check mr-1"></i> Salvar alterações</button>' : '<span class="text-[10px] text-gray-500">Entre como Admin para editar categorias.</span>'}
+                    </div>
+                </form>`;
+
+            document.getElementById('categoryPreviewIcon').onerror = event => event.currentTarget.remove();
+            document.getElementById('categoryDeleteButton').addEventListener('click', () => deleteCategory(selected.id));
+            document.getElementById('categoryEditForm').addEventListener('submit', saveCategory);
+            document.getElementById('categoryRole').addEventListener('change', event => {
+                const selectedRole = CATEGORY_ROLES[event.currentTarget.value];
+                document.getElementById('categoryPreviewRole').textContent = selectedRole.name;
+            });
         }
 
         function toggleAdminMode() {
